@@ -239,7 +239,7 @@ CL_FreeReliableCommands
 Wipes all reliableCommands strings from clc
 =====================
 */
-void CL_FreeReliableCommands()
+static void CL_FreeReliableCommands()
 {
 	// wipe the client connection
 	for (auto& reliableCommand : clc.reliableCommands)
@@ -353,7 +353,7 @@ CONSOLE COMMANDS
 CL_ForwardToServer_f
 ==================
 */
-void CL_ForwardToServer_f()
+static void CL_ForwardToServer_f()
 {
 	if (cls.state != CA_ACTIVE)
 	{
@@ -451,7 +451,7 @@ void CL_Snd_Restart_f()
 CL_Configstrings_f
 ==================
 */
-void CL_Configstrings_f()
+static void CL_Configstrings_f()
 {
 	if (cls.state != CA_ACTIVE)
 	{
@@ -468,6 +468,9 @@ void CL_Configstrings_f()
 		}
 		Com_Printf("%4i: %s\n", i, cl.gameState.stringData + ofs);
 	}
+
+	// GCJ: Add this line to be able to report how much data our config strings are using
+	Com_Printf("Config String Length: %i\n", cl.gameState.dataCount);
 }
 
 /*
@@ -475,7 +478,7 @@ void CL_Configstrings_f()
 CL_Clientinfo_f
 ==============
 */
-void CL_Clientinfo_f()
+static void CL_Clientinfo_f()
 {
 	Com_Printf("--------- Client Information ---------\n");
 	Com_Printf("state: %i\n", cls.state);
@@ -561,7 +564,7 @@ to the server, the server will send out of band disconnect packets
 to the client so it doesn't have to wait for the full timeout period.
 ===================
 */
-void CL_DisconnectPacket(const netadr_t from)
+static void CL_DisconnectPacket(const netadr_t from)
 {
 	if (cls.state != CA_ACTIVE)
 	{
@@ -593,7 +596,7 @@ CL_ConnectionlessPacket
 Responses to broadcasts, etc
 =================
 */
-void CL_ConnectionlessPacket(const netadr_t from, msg_t* msg)
+static void CL_ConnectionlessPacket(const netadr_t from, msg_t* msg)
 {
 	MSG_BeginReading(msg);
 	MSG_ReadLong(msg); // skip the -1
@@ -735,7 +738,7 @@ CL_CheckTimeout
 
 ==================
 */
-void CL_CheckTimeout()
+static void CL_CheckTimeout()
 {
 	//
 	// check timeout
@@ -783,7 +786,7 @@ CL_CheckUserinfo
 
 ==================
 */
-void CL_CheckUserinfo()
+static void CL_CheckUserinfo()
 {
 	if (cls.state < CA_CHALLENGING)
 	{
@@ -1003,7 +1006,7 @@ static void CL_StartSound()
 CL_InitRenderer
 ============
 */
-void CL_InitRenderer()
+static void CL_InitRenderer()
 {
 	// this sets up the renderer and calls R_Init
 	re.BeginRegistration(&cls.glconfig);
@@ -1071,7 +1074,7 @@ CL_RefPrintf
 DLL glue
 ================
 */
-void QDECL CL_RefPrintf(const int print_level, const char* fmt, ...)
+static void QDECL CL_RefPrintf(const int print_level, const char* fmt, ...)
 {
 	va_list argptr;
 	char msg[MAXPRINTMSG];
@@ -1102,7 +1105,7 @@ DLL glue, but highly reusuable DLL glue at that
 ============
 */
 
-const char* String_GetStringValue(const char* reference)
+static const char* String_GetStringValue(const char* reference)
 {
 #ifndef JK2_MODE
 	return SE_GetString(reference);
@@ -1116,27 +1119,27 @@ extern void* gpvCachedMapDiskImage;
 extern char gsCachedMapDiskImage[MAX_QPATH];
 extern qboolean gbUsingCachedMapDataRightNow;
 
-char* get_gsCachedMapDiskImage()
+static char* get_gsCachedMapDiskImage()
 {
 	return gsCachedMapDiskImage;
 }
 
-void* get_gpvCachedMapDiskImage()
+static void* get_gpvCachedMapDiskImage()
 {
 	return gpvCachedMapDiskImage;
 }
 
-qboolean* get_gbUsingCachedMapDataRightNow()
+static qboolean* get_gbUsingCachedMapDataRightNow()
 {
 	return &gbUsingCachedMapDataRightNow;
 }
 
-qboolean* get_gbAlreadyDoingLoad()
+static qboolean* get_gbAlreadyDoingLoad()
 {
 	return &gbAlreadyDoingLoad;
 }
 
-int get_com_frameTime()
+static int get_com_frameTime()
 {
 	return com_frameTime;
 }

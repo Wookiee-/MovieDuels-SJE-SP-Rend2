@@ -646,6 +646,8 @@ void CG_RegisterWeapon(const int weapon_num)
 		cgi_R_RegisterShader("gfx/effects/solidWhite_cull");
 		cgi_R_RegisterShader("gfx/effects/forcePush");
 		cgi_R_RegisterShader("gfx/effects/saberFlare");
+
+
 		cgs.media.redSaberGlowShader = cgi_R_RegisterShader("gfx/effects/sabers/red_glow");
 		cgs.media.redSaberCoreShader = cgi_R_RegisterShader("gfx/effects/sabers/red_line");
 		cgs.media.orangeSaberGlowShader = cgi_R_RegisterShader("gfx/effects/sabers/orange_glow");

@@ -144,7 +144,7 @@ const char* NET_AdrToString(netadr_t a);
 qboolean NET_StringToAdr(const char* s, netadr_t* a);
 qboolean NET_GetLoopPacket(netsrc_t sock, netadr_t* net_from, msg_t* net_message);
 
-#define	MAX_MSGLEN				(1*17408)		// max length of a message, which may
+#define	MAX_MSGLEN				(2*17408)		// max length of a message, which may be fragmented into multiple packets
 
 /*
 Netchan handles packet fragmentation and out of order / duplicate suppression
@@ -241,7 +241,7 @@ using vmSlots_t = enum vmSlots_e
 
 inline float _vmf(const intptr_t x)
 {
-	byteAlias_t fi;
+	byteAlias_t fi{};
 	fi.i = x;
 	return fi.f;
 }

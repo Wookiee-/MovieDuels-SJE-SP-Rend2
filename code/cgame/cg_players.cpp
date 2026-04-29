@@ -11390,6 +11390,7 @@ static void CG_DoCloakedSaber(vec3_t origin, vec3_t dir, float length, float len
 	if (do_light)
 	{
 		CG_RGBForSaberColor(color, rgb);
+		VectorScale(rgb, 0.66f, rgb);
 		cgi_R_AddLightToScene(mid, length * 1.4f + Q_flrand(0.0f, 1.0f) * 3.0f, rgb[0], rgb[1], rgb[2]);
 	}
 
@@ -11424,6 +11425,7 @@ static void CG_DoCloakedSaber(vec3_t origin, vec3_t dir, float length, float len
 	VectorCopy(dir, saber.axis[0]);
 	saber.reType = RT_SABER_GLOW;
 	saber.customShader = glow;
+
 	saber.shaderRGBA[0] = saber.shaderRGBA[1] = saber.shaderRGBA[2] = saber.shaderRGBA[3] = 0xff;
 	saber.renderfx = rfx;
 
@@ -11472,6 +11474,7 @@ static void CG_DoCloakedSaber(vec3_t origin, vec3_t dir, float length, float len
 		saber.shaderRGBA[1] = 0xff;
 		saber.shaderRGBA[2] = 0xff;
 		saber.shaderRGBA[3] = 0xff;
+
 		if (color == SABER_BLACK)
 		{
 			saber.customShader = cgs.media.blackIgniteFlare;
@@ -14093,9 +14096,9 @@ static void CG_AddSaberBladeGo(centity_t* cent, centity_t* scent, const int rend
 		}
 		else
 		{
-			if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE || cent->gent->client->ps.saber[
-				saber_num].
-				type == SABER_STAFF_UNSTABLE)
+			if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE	||
+				cent->gent->client->ps.saber[saber_num].type == SABER_STAFF_UNSTABLE ||
+				cent->gent->client->ps.saber[saber_num].type == SABER_ELECTROSTAFF)
 			{
 				CG_DoSaberUnstable(org, axis[0], length, client->ps.saber[saber_num].blade[blade_num].lengthMax,
 					client->ps.saber[saber_num].blade[blade_num].radius,
@@ -14240,8 +14243,9 @@ static void CG_AddSaberBladeGo(centity_t* cent, centity_t* scent, const int rend
 		{
 			if (cg_SFXSabers.integer < 1)
 			{
-				if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE || cent->gent->client->ps.saber[
-					saber_num].type == SABER_STAFF_UNSTABLE)
+				if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE ||
+					cent->gent->client->ps.saber[saber_num].type == SABER_STAFF_UNSTABLE ||
+					cent->gent->client->ps.saber[saber_num].type == SABER_ELECTROSTAFF)
 				{
 					CG_DoSaberUnstable(org, axis[0], length, client->ps.saber[saber_num].blade[blade_num].lengthMax,
 						client->ps.saber[saber_num].blade[blade_num].radius,
@@ -14256,20 +14260,19 @@ static void CG_AddSaberBladeGo(centity_t* cent, centity_t* scent, const int rend
 						static_cast<qboolean>(!no_dlight));
 				}
 			}
-			else if (!(cent->gent->client->ps.saber[saber_num].type == SABER_SITH_SWORD || client->ps.saber[saber_num].
-				saberFlags2 & SFL2_NO_BLADE))
+			else if (!(cent->gent->client->ps.saber[saber_num].type == SABER_SITH_SWORD || client->ps.saber[saber_num].saberFlags2 & SFL2_NO_BLADE))
 			{
 				switch (cg_SFXSabers.integer)
 				{
 				case 1:
-					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE || cent->gent->client->ps.saber[
-						saber_num].type == SABER_STAFF_UNSTABLE)
+					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_STAFF_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_ELECTROSTAFF)
 					{
-						CG_DoUnstableSaber(cent, fx->mVerts[0].origin, fx->mVerts[1].origin, fx->mVerts[2].origin,
-							fx->mVerts[3].origin, client->ps.saber[saber_num].blade[blade_num].lengthMax,
+						CG_DoSaberUnstable(org, axis[0], length, client->ps.saber[saber_num].blade[blade_num].lengthMax,
 							client->ps.saber[saber_num].blade[blade_num].radius,
 							client->ps.saber[saber_num].blade[blade_num].color, renderfx,
-							static_cast<qboolean>(no_dlight == qfalse));
+							static_cast<qboolean>(!no_dlight));
 					}
 					else
 					{
@@ -14283,14 +14286,14 @@ static void CG_AddSaberBladeGo(centity_t* cent, centity_t* scent, const int rend
 					}
 					break;
 				case 2:
-					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE || cent->gent->client->ps.saber[
-						saber_num].type == SABER_STAFF_UNSTABLE)
+					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_STAFF_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_ELECTROSTAFF)
 					{
-						CG_DoUnstableSaber(cent, fx->mVerts[0].origin, fx->mVerts[1].origin, fx->mVerts[2].origin,
-							fx->mVerts[3].origin, client->ps.saber[saber_num].blade[blade_num].lengthMax,
+						CG_DoSaberUnstable(org, axis[0], length, client->ps.saber[saber_num].blade[blade_num].lengthMax,
 							client->ps.saber[saber_num].blade[blade_num].radius,
 							client->ps.saber[saber_num].blade[blade_num].color, renderfx,
-							static_cast<qboolean>(no_dlight == qfalse));
+							static_cast<qboolean>(!no_dlight));
 					}
 					else
 					{
@@ -14304,14 +14307,14 @@ static void CG_AddSaberBladeGo(centity_t* cent, centity_t* scent, const int rend
 					}
 					break;
 				case 3:
-					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE || cent->gent->client->ps.saber[
-						saber_num].type == SABER_STAFF_UNSTABLE)
+					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_STAFF_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_ELECTROSTAFF)
 					{
-						CG_DoUnstableSaber(cent, fx->mVerts[0].origin, fx->mVerts[1].origin, fx->mVerts[2].origin,
-							fx->mVerts[3].origin, client->ps.saber[saber_num].blade[blade_num].lengthMax,
+						CG_DoSaberUnstable(org, axis[0], length, client->ps.saber[saber_num].blade[blade_num].lengthMax,
 							client->ps.saber[saber_num].blade[blade_num].radius,
 							client->ps.saber[saber_num].blade[blade_num].color, renderfx,
-							static_cast<qboolean>(no_dlight == qfalse));
+							static_cast<qboolean>(!no_dlight));
 					}
 					else
 					{
@@ -14325,14 +14328,14 @@ static void CG_AddSaberBladeGo(centity_t* cent, centity_t* scent, const int rend
 					}
 					break;
 				case 4:
-					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE || cent->gent->client->ps.saber[
-						saber_num].type == SABER_STAFF_UNSTABLE)
+					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_STAFF_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_ELECTROSTAFF)
 					{
-						CG_DoUnstableSaber(cent, fx->mVerts[0].origin, fx->mVerts[1].origin, fx->mVerts[2].origin,
-							fx->mVerts[3].origin, client->ps.saber[saber_num].blade[blade_num].lengthMax,
+						CG_DoSaberUnstable(org, axis[0], length, client->ps.saber[saber_num].blade[blade_num].lengthMax,
 							client->ps.saber[saber_num].blade[blade_num].radius,
 							client->ps.saber[saber_num].blade[blade_num].color, renderfx,
-							static_cast<qboolean>(no_dlight == qfalse));
+							static_cast<qboolean>(!no_dlight));
 					}
 					else
 					{
@@ -14346,14 +14349,14 @@ static void CG_AddSaberBladeGo(centity_t* cent, centity_t* scent, const int rend
 					}
 					break;
 				case 5:
-					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE || cent->gent->client->ps.saber[
-						saber_num].type == SABER_STAFF_UNSTABLE)
+					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_STAFF_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_ELECTROSTAFF)
 					{
-						CG_DoUnstableSaber(cent, fx->mVerts[0].origin, fx->mVerts[1].origin, fx->mVerts[2].origin,
-							fx->mVerts[3].origin, client->ps.saber[saber_num].blade[blade_num].lengthMax,
+						CG_DoSaberUnstable(org, axis[0], length, client->ps.saber[saber_num].blade[blade_num].lengthMax,
 							client->ps.saber[saber_num].blade[blade_num].radius,
 							client->ps.saber[saber_num].blade[blade_num].color, renderfx,
-							static_cast<qboolean>(no_dlight == qfalse));
+							static_cast<qboolean>(!no_dlight));
 					}
 					else
 					{
@@ -14367,14 +14370,14 @@ static void CG_AddSaberBladeGo(centity_t* cent, centity_t* scent, const int rend
 					}
 					break;
 				case 6:
-					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE || cent->gent->client->ps.saber[
-						saber_num].type == SABER_STAFF_UNSTABLE)
+					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_STAFF_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_ELECTROSTAFF)
 					{
-						CG_DoUnstableSaber(cent, fx->mVerts[0].origin, fx->mVerts[1].origin, fx->mVerts[2].origin,
-							fx->mVerts[3].origin, client->ps.saber[saber_num].blade[blade_num].lengthMax,
+						CG_DoSaberUnstable(org, axis[0], length, client->ps.saber[saber_num].blade[blade_num].lengthMax,
 							client->ps.saber[saber_num].blade[blade_num].radius,
 							client->ps.saber[saber_num].blade[blade_num].color, renderfx,
-							static_cast<qboolean>(no_dlight == qfalse));
+							static_cast<qboolean>(!no_dlight));
 					}
 					else
 					{
@@ -14388,14 +14391,14 @@ static void CG_AddSaberBladeGo(centity_t* cent, centity_t* scent, const int rend
 					}
 					break;
 				case 7:
-					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE || cent->gent->client->ps.saber[
-						saber_num].type == SABER_STAFF_UNSTABLE)
+					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_STAFF_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_ELECTROSTAFF)
 					{
-						CG_DoUnstableSaber(cent, fx->mVerts[0].origin, fx->mVerts[1].origin, fx->mVerts[2].origin,
-							fx->mVerts[3].origin, client->ps.saber[saber_num].blade[blade_num].lengthMax,
+						CG_DoSaberUnstable(org, axis[0], length, client->ps.saber[saber_num].blade[blade_num].lengthMax,
 							client->ps.saber[saber_num].blade[blade_num].radius,
 							client->ps.saber[saber_num].blade[blade_num].color, renderfx,
-							static_cast<qboolean>(no_dlight == qfalse));
+							static_cast<qboolean>(!no_dlight));
 					}
 					else
 					{
@@ -14409,14 +14412,14 @@ static void CG_AddSaberBladeGo(centity_t* cent, centity_t* scent, const int rend
 					}
 					break;
 				case 8:
-					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE || cent->gent->client->ps.saber[
-						saber_num].type == SABER_STAFF_UNSTABLE)
+					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_STAFF_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_ELECTROSTAFF)
 					{
-						CG_DoUnstableSaber(cent, fx->mVerts[0].origin, fx->mVerts[1].origin, fx->mVerts[2].origin,
-							fx->mVerts[3].origin, client->ps.saber[saber_num].blade[blade_num].lengthMax,
+						CG_DoSaberUnstable(org, axis[0], length, client->ps.saber[saber_num].blade[blade_num].lengthMax,
 							client->ps.saber[saber_num].blade[blade_num].radius,
 							client->ps.saber[saber_num].blade[blade_num].color, renderfx,
-							static_cast<qboolean>(no_dlight == qfalse));
+							static_cast<qboolean>(!no_dlight));
 					}
 					else
 					{
@@ -14428,14 +14431,14 @@ static void CG_AddSaberBladeGo(centity_t* cent, centity_t* scent, const int rend
 					}
 					break;
 				case 9:
-					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE || cent->gent->client->ps.saber[
-						saber_num].type == SABER_STAFF_UNSTABLE)
+					if (cent->gent->client->ps.saber[saber_num].type == SABER_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_STAFF_UNSTABLE ||
+						cent->gent->client->ps.saber[saber_num].type == SABER_ELECTROSTAFF)
 					{
-						CG_DoUnstableSaber(cent, fx->mVerts[0].origin, fx->mVerts[1].origin, fx->mVerts[2].origin,
-							fx->mVerts[3].origin, client->ps.saber[saber_num].blade[blade_num].lengthMax,
+						CG_DoSaberUnstable(org, axis[0], length, client->ps.saber[saber_num].blade[blade_num].lengthMax,
 							client->ps.saber[saber_num].blade[blade_num].radius,
 							client->ps.saber[saber_num].blade[blade_num].color, renderfx,
-							static_cast<qboolean>(no_dlight == qfalse));
+							static_cast<qboolean>(!no_dlight));
 					}
 					else
 					{
