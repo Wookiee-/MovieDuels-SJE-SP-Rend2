@@ -803,6 +803,7 @@ static void UI_DoSFXSaber(vec3_t blade_muz, vec3_t blade_dir, const float length
 		saber.shaderRGBA[0] = saber.shaderRGBA[1] = saber.shaderRGBA[2] = saber.shaderRGBA[3] = 0xff;
 
 		DC->addRefEntityToScene(&saber);
+		DC->addRefEntityToScene(&saber);
 	}
 }
 
@@ -946,6 +947,7 @@ static void UI_DoEp1Saber(vec3_t blade_muz, vec3_t blade_dir, const float length
 		saber.shaderTexCoord[0] = saber.shaderTexCoord[1] = 1.0f;
 		saber.shaderRGBA[0] = saber.shaderRGBA[1] = saber.shaderRGBA[2] = saber.shaderRGBA[3] = 0xff;
 
+		DC->addRefEntityToScene(&saber);
 		DC->addRefEntityToScene(&saber);
 	}
 }
@@ -1092,6 +1094,7 @@ static void UI_DoEp2Saber(vec3_t blade_muz, vec3_t blade_dir, const float length
 		saber.shaderRGBA[0] = saber.shaderRGBA[1] = saber.shaderRGBA[2] = saber.shaderRGBA[3] = 0xff;
 
 		DC->addRefEntityToScene(&saber);
+		DC->addRefEntityToScene(&saber);
 	}
 }
 
@@ -1236,6 +1239,7 @@ static void UI_DoEp3Saber(vec3_t blade_muz, vec3_t blade_dir, const float length
 		saber.shaderRGBA[0] = saber.shaderRGBA[1] = saber.shaderRGBA[2] = saber.shaderRGBA[3] = 0xff;
 
 		DC->addRefEntityToScene(&saber);
+		DC->addRefEntityToScene(&saber);
 	}
 }
 
@@ -1378,6 +1382,7 @@ static void UI_DoOTSaber(vec3_t blade_muz, vec3_t blade_dir, const float length_
 		saber.shaderRGBA[0] = saber.shaderRGBA[1] = saber.shaderRGBA[2] = saber.shaderRGBA[3] = 0xff;
 
 		DC->addRefEntityToScene(&saber);
+		DC->addRefEntityToScene(&saber);
 	}
 }
 
@@ -1512,6 +1517,7 @@ static void UI_DoRotJSaber(vec3_t blade_muz, vec3_t blade_dir, const float lengt
 		saber.shaderTexCoord[0] = saber.shaderTexCoord[1] = 1.0f;
 		saber.shaderRGBA[0] = saber.shaderRGBA[1] = saber.shaderRGBA[2] = saber.shaderRGBA[3] = 0xff;
 
+		DC->addRefEntityToScene(&saber);
 		DC->addRefEntityToScene(&saber);
 	}
 }
@@ -1852,6 +1858,7 @@ static void UI_DoUnstableSaber(vec3_t blade_muz, vec3_t blade_dir, const float l
 		saber.shaderRGBA[0] = saber.shaderRGBA[1] = saber.shaderRGBA[2] = saber.shaderRGBA[3] = 0xff;
 
 		DC->addRefEntityToScene(&saber);
+		DC->addRefEntityToScene(&saber);
 	}
 }
 
@@ -1987,6 +1994,7 @@ static void UI_DoSaberUnstable(vec3_t blade_muz, vec3_t blade_dir, const float l
 		saber.shaderTexCoord[0] = saber.shaderTexCoord[1] = 1.0f;
 		saber.shaderRGBA[0] = saber.shaderRGBA[1] = saber.shaderRGBA[2] = saber.shaderRGBA[3] = 0xff;
 
+		DC->addRefEntityToScene(&saber);
 		DC->addRefEntityToScene(&saber);
 	}
 }
