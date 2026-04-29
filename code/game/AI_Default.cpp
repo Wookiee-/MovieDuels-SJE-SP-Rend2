@@ -212,32 +212,32 @@ void g_do_m_block_response(const gentity_t* speaker_npc_self)
 	{
 	case 0:
 		// Gloat lines
-		G_AddVoiceEvent(speaker_npc_self, Q_irand(EV_GLOAT1, EV_GLOAT3), 2000);
+		G_AddVoiceEvent(speaker_npc_self, Q_irand(EV_GLOAT1, EV_GLOAT3), 10000);
 		break;
 
 	case 1:
 		// Chase / pursuit lines
-		G_AddVoiceEvent(speaker_npc_self, Q_irand(EV_JCHASE1, EV_JCHASE3), 2000);
+		G_AddVoiceEvent(speaker_npc_self, Q_irand(EV_JCHASE1, EV_JCHASE3), 10000);
 		break;
 
 	case 2:
 		// Generic combat barks
-		G_AddVoiceEvent(speaker_npc_self, Q_irand(EV_COMBAT1, EV_COMBAT3), 2000);
+		G_AddVoiceEvent(speaker_npc_self, Q_irand(EV_COMBAT1, EV_COMBAT3), 10000);
 		break;
 
 	case 3:
 		// Anger / frustration lines
-		G_AddVoiceEvent(speaker_npc_self, Q_irand(EV_ANGER1, EV_ANGER3), 2000);
+		G_AddVoiceEvent(speaker_npc_self, Q_irand(EV_ANGER1, EV_ANGER3), 10000);
 		break;
 
 	case 4:
 		// Taunt lines
-		G_AddVoiceEvent(speaker_npc_self, Q_irand(EV_TAUNT1, EV_TAUNT3), 2000);
+		G_AddVoiceEvent(speaker_npc_self, Q_irand(EV_TAUNT1, EV_TAUNT3), 10000);
 		break;
 
 	default:
 		// Pushed / reaction lines
-		G_AddVoiceEvent(speaker_npc_self, Q_irand(EV_PUSHED1, EV_PUSHED3), 2000);
+		G_AddVoiceEvent(speaker_npc_self, Q_irand(EV_PUSHED1, EV_PUSHED3), 10000);
 		break;
 	}
 }

@@ -8525,21 +8525,9 @@ static void jedi_combat()
 	{
 		Jedi_EvasionSaber(enemy_movedir, enemy_dist, enemy_dir);
 	}
-	else
+	else if (!in_camera)
 	{
-		if (!in_camera)
-		{
-			NPC_CheckEvasion();
-		}
-
-		if (!npc_is_dark_jedi(NPC))
-		{
-			G_AddVoiceEvent(NPC, Q_irand(EV_DEFLECT1, EV_DEFLECT3), 2000);
-		}
-		else
-		{
-			G_AddVoiceEvent(NPC, Q_irand(EV_TAUNT1, EV_TAUNT3), 10000);
-		}
+		NPC_CheckEvasion();
 	}
 
 	jedi_timers_apply();
