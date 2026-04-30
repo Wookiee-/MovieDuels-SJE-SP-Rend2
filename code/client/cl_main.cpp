@@ -1378,7 +1378,7 @@ void CL_Init()
 
 #ifdef JK2_MODE
 	// this is required for savegame compatibility - not ever actually used
-	Cvar_Get("snaps", "120", CVAR_USERINFO);
+	Cvar_Get("snaps", "20", CVAR_USERINFO);
 	Cvar_Get("sex", "male", CVAR_USERINFO | CVAR_ARCHIVE);
 	Cvar_Get("handicap", "100", CVAR_USERINFO | CVAR_SAVEGAME);
 #else
