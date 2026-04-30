@@ -32087,8 +32087,9 @@ void ForceLightning(gentity_t* self)
 			return;
 		}
 
-		if (self->client->ps.weaponTime > 0
-			&& (!PM_SaberInParry(self->client->ps.saber_move) || !(self->client->ps.userInt3 & 1 << FLAG_PREBLOCK)))
+		if (self->client->ps.weaponTime > 0	&&
+			(!PM_SaberInParry(self->client->ps.saber_move) || 
+				!(self->client->ps.userInt3 & 1 << FLAG_PREBLOCK)))
 		{
 			return;
 		}
@@ -32128,8 +32129,7 @@ void ForceLightning(gentity_t* self)
 	}
 
 	if (self->s.number >= MAX_CLIENTS && !G_ControlledByPlayer(self) && self->client->ps.weapon == WP_SABER)
-		//npc force use limit
-	{
+	{// non-player NPCs should stop grip and grasp when using lightning, but players can still use them if they want to
 		if (self->client->ps.forcePowersActive & 1 << FP_GRIP)
 		{
 			WP_ForcePowerStop(self, FP_GRIP);
