@@ -9282,10 +9282,14 @@ static qboolean NPC_CanDoKata(gentity_t* self)
 		return qfalse;
 	}
 
-	// cooldown: 60 seconds (60000 ms)
-	const int kataCooldownMs = 60000;
 	if (self->NPC->lastKataTime > level.time)
 	{
+		return qfalse;
+	}
+
+	if (!TIMER_Done(NPC, "KataTime"))
+	{
+		//still doin kata from last time
 		return qfalse;
 	}
 
@@ -9296,38 +9300,11 @@ static qboolean NPC_CanDoKata(gentity_t* self)
 		return qfalse;
 	}
 
-	// compute enemy health percentage (safe against zero max)
-	float maxHealth = (float)enemy->client->ps.stats[STAT_MAX_HEALTH];
-	if (maxHealth <= 0.0f)
-	{
-		maxHealth = (float)enemy->client->ps.stats[STAT_HEALTH];
-		if (maxHealth <= 0.0f)
-		{
-			return qfalse;
-		}
-	}
-	float enemyHealthPct = (float)enemy->health / maxHealth;
-
-	// compute enemy block percentage
-	float enemyBlockPct = 0.0f;
-	enemyBlockPct = (float)enemy->client->ps.blockPoints / (float)BLOCK_POINTS_MAX;
-
-	// allow kata only if enemy health < 25% OR blockPoints < 25%
-	if (enemyHealthPct < 0.25f || enemyBlockPct < 0.25f)
-	{
-		return qtrue;
-	}
-
-	return qfalse;
+	return qtrue;
 }
 
 static qboolean Jedi_CheckKataAttack()
 {
-	if (!TIMER_Done(NPC, "KataTime"))
-	{
-		//still doin kata from last time
-		return qfalse;
-	}
 	if (NPC_CanDoKata(NPC))
 	{
 		//only top-level guys and bosses do this
@@ -9346,29 +9323,18 @@ static qboolean Jedi_CheckKataAttack()
 					if (ucmd.upmove <= 0 && NPC->client->ps.forceJumpCharge <= 0)
 					{
 						//not going to try to jump
-						// --- Special attack frequency modifier ---
-						float freqMod = 1.0f;
-						if (g_npcSpecialAttackFreq && g_npcSpecialAttackFreq->value > 0.0f) {
-							freqMod = g_npcSpecialAttackFreq->value;
-						}
-						// Clamp to [0.01, 10.0] for sanity
-						if (freqMod < 0.01f) freqMod = 0.01f;
-						if (freqMod > 10.0f) freqMod = 10.0f;
-
-						// The original logic: Q_irand(0, g_spskill->integer + 1) && !Q_irand(0, 9)
-						// We'll use freqMod to scale the chance:
-						// If freqMod < 1, specials are rarer; if > 1, more frequent
+						
+						// Special attack frequency modifier
+						float freqMod = Com_Clamp(0.0f, 1.0f, g_npcSpecialAttackFreq->value);
 						bool doSpecial = false;
+
 						if (Q_irand(0, g_spskill->integer + 1) && !Q_irand(0, 9)) {
-							// Default chance
-							if (freqMod >= 1.0f || Q_flrand(0.0f, 1.0f) < freqMod) {
+							// A lower freqMod value means a lower chance of a special attack.
+							if (freqMod >= Q_flrand(0.0f, 1.0f)) {
 								doSpecial = true;
 							}
 						}
-						else if (freqMod < 1.0f && Q_flrand(0.0f, 1.0f) < freqMod) {
-							// If freqMod is low, allow a rare special even if the above failed
-							doSpecial = true;
-						}
+
 						if (doSpecial) {
 							ucmd.upmove = 0;
 							VectorClear(NPC->client->ps.moveDir);
@@ -9380,14 +9346,14 @@ static qboolean Jedi_CheckKataAttack()
 							{
 								ucmd.buttons |= BUTTON_ALT_ATTACK;
 							}
-							NPC->lastKataTime = level.time + 60000;
+							NPC->lastKataTime = level.time + Q_irand(6000, 10000);
+							TIMER_Set(NPC, "KataTime", Q_irand(5000, 7000));
 							return qtrue;
 						}
 					}
 				}
 			}
 		}
-		TIMER_Set(NPC, "KataTime", Q_irand(5000, 7000));
 	}
 	return qfalse;
 }
@@ -9822,12 +9788,12 @@ static void JediHandleSpacing(gentity_t* self)
 								self->client->ps.saber_move = LS_SPINATTACK;   // Spin
 								break;
 							}
-							NPCInfo->kataDebounceTime = level.time + Q_irand(60000, 100000);
+							NPCInfo->kataDebounceTime = level.time + Q_irand(6000, 10000);
 						}
 					}
 
 					// Set next allowed jump-in time (2–4 seconds)
-					self->NPC->jumpTime = level.time + Q_irand(20000, 40000);
+					self->NPC->jumpTime = level.time + Q_irand(2000, 4000);
 
 					return;
 				}
@@ -9866,12 +9832,12 @@ static void JediHandleSpacing(gentity_t* self)
 					{
 						self->client->ps.saber_move = BOTH_LUNGE2_B__T_;
 						self->client->ps.weaponTime = level.time + 400;
-						NPCInfo->kataDebounceTime = level.time + Q_irand(60000, 100000);
+						NPCInfo->kataDebounceTime = level.time + Q_irand(6000, 10000);
 					}
 				}
 
 				// Set next allowed jump-in time (2–4 seconds)
-				self->NPC->jumpTime = level.time + Q_irand(20000, 40000);
+				self->NPC->jumpTime = level.time + Q_irand(2000, 4000);
 
 				return;
 			}
