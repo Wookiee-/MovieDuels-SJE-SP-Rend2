@@ -1682,11 +1682,11 @@ void NPC_Begin(gentity_t* ent)
 	}
 	else if (ent->NPC->stats.health) // Was health supplied in NPC.cfg?
 	{
+		/* Base JKA
+		* 
 		if (ent->client->NPC_class != CLASS_REBORN
 			&& ent->client->NPC_class != CLASS_SHADOWTROOPER
-			&& ent->client->NPC_class != CLASS_GUARD
-			&& ent->client->NPC_class != CLASS_JEDI
-			&& ent->client->NPC_class != CLASS_AHSOKA)
+			&& ent->client->NPC_class != CLASS_JEDI)
 		{
 			// up everyone except jedi
 			if (!Q_stricmp("tavion_sith_sword", ent->NPC_type)
@@ -1704,6 +1704,12 @@ void NPC_Begin(gentity_t* ent)
 				// 100% on easy, 125% on medium, 150% on hard
 			}
 		}
+
+		ent->max_health = client->pers.maxHealth = client->ps.stats[STAT_MAX_HEALTH] = ent->NPC->stats.health;
+		*/
+
+		// Affect all NPCs - 75% on easy, 100% on medium, 125% on hard
+		ent->NPC->stats.health = ceil(static_cast<float>(ent->NPC->stats.health) * 0.75f + static_cast<float>(ent->NPC->stats.health) / 4.0f * g_spskill->value);
 
 		ent->max_health = client->pers.maxHealth = client->ps.stats[STAT_MAX_HEALTH] = ent->NPC->stats.health;
 	}
