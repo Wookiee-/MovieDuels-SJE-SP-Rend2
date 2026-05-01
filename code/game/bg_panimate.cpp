@@ -3604,7 +3604,6 @@ saber_moveName_t PM_NPC_Force_Leap_Attack()
 }
 
 constexpr auto SPECIAL_ATTACK_DISTANCE = 128;
-extern qboolean npc_is_sith_lord(const gentity_t* self);
 
 qboolean PM_Can_Do_Kill_Lunge(void)
 {
@@ -3620,7 +3619,6 @@ qboolean PM_Can_Do_Kill_Lunge(void)
 	}
 
 	const int clientNum = pm->ps->clientNum;
-	const int killLungeCooldownMs = 60000; // 1 minute
 
 	// If this is an NPC (entity numbers >= MAX_CLIENTS), check NPC cooldown field.
 	if (clientNum >= MAX_CLIENTS && clientNum < ENTITYNUM_MAX_NORMAL)
@@ -3632,12 +3630,8 @@ qboolean PM_Can_Do_Kill_Lunge(void)
 			return qfalse;
 		}
 
-		if (level.time < ent->NPC->lastKataTime)
-		{
-			return qfalse;
-		}
-
-		if (npc_is_sith_lord(ent))
+		// Cooldown
+		if (!TIMER_Done(NPC, "noKata"))
 		{
 			return qfalse;
 		}
@@ -3657,19 +3651,14 @@ qboolean PM_Can_Do_Kill_Lunge(void)
 
 	if (tr.fraction != 1.0f && tr.entityNum >= 0 && tr.entityNum < MAX_CLIENTS)
 	{
-		// Hit a client — start cooldown for NPCs (and optionally players)
+		// Hit a client — start cooldown for NPCs
 		if (clientNum >= MAX_CLIENTS && clientNum < ENTITYNUM_MAX_NORMAL)
 		{
 			gentity_t* ent = &g_entities[clientNum];
 			if (ent && ent->NPC)
 			{
-				ent->NPC->lastKataTime = level.time + killLungeCooldownMs;
+				TIMER_Set(NPC, "noKata", Q_irand(6000, 12000));
 			}
-		}
-		else if (clientNum >= 0 && clientNum < MAX_CLIENTS)
-		{
-			static int lastKillLungeTime[MAX_CLIENTS] = { 0 };
-			lastKillLungeTime[clientNum] = level.time + killLungeCooldownMs;
 		}
 
 		return qtrue;
@@ -3692,7 +3681,6 @@ qboolean PM_Can_Do_Kill_Lunge_back(void)
 	}
 
 	const int clientNum = pm->ps->clientNum;
-	const int killLungeCooldownMs = 60000; // 1 minute
 
 	// NPC cooldown check
 	if (clientNum >= MAX_CLIENTS && clientNum < ENTITYNUM_MAX_NORMAL)
@@ -3702,12 +3690,9 @@ qboolean PM_Can_Do_Kill_Lunge_back(void)
 		{
 			return qfalse;
 		}
-		if (level.time < ent->NPC->lastKataTime)
-		{
-			return qfalse;
-		}
 
-		if (npc_is_sith_lord(ent))
+		// Cooldown
+		if (!TIMER_Done(NPC, "noKata"))
 		{
 			return qfalse;
 		}
@@ -3727,19 +3712,14 @@ qboolean PM_Can_Do_Kill_Lunge_back(void)
 
 	if (tr.fraction != 1.0f && tr.entityNum >= 0 && tr.entityNum < MAX_CLIENTS)
 	{
-		// Hit a client behind us — start cooldown for NPCs (and optionally players)
+		// Hit a client behind us — start cooldown for NPCs
 		if (clientNum >= MAX_CLIENTS && clientNum < ENTITYNUM_MAX_NORMAL)
 		{
 			gentity_t* ent = &g_entities[clientNum];
 			if (ent && ent->NPC)
 			{
-				ent->NPC->lastKataTime = level.time + killLungeCooldownMs;
+				TIMER_Set(NPC, "noKata", Q_irand(6000, 12000));
 			}
-		}
-		else if (clientNum >= 0 && clientNum < MAX_CLIENTS)
-		{
-			static int lastKillLungeBackTime[MAX_CLIENTS] = { 0 };
-			lastKillLungeBackTime[clientNum] = level.time + killLungeCooldownMs;
 		}
 
 		return qtrue;

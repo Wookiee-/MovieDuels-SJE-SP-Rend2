@@ -1558,7 +1558,6 @@ struct gentity_s
 	faction_t friendlyfaction;
 	int saberPowerTime;
 	qboolean saberPower;
-	int lastKataTime; // timestamp (level.time) when kata is next allowed; 0 = allowed now
 	int Dash_Count;
 
 	void sg_export(
@@ -1780,7 +1779,6 @@ struct gentity_s
 		saved_game.write<int32_t>(friendlyfaction);
 		saved_game.write<int32_t>(saberPowerTime);
 		saved_game.write<int32_t>(saberPower);
-		saved_game.write<int32_t>(lastKataTime);
 		saved_game.write<int32_t>(Dash_Count);
 	}
 
@@ -2003,7 +2001,6 @@ struct gentity_s
 		saved_game.read<int32_t>(friendlyfaction);
 		saved_game.read<int32_t>(saberPowerTime);
 		saved_game.read<int32_t>(saberPower);
-		saved_game.read<int32_t>(lastKataTime);
 		saved_game.read<int32_t>(Dash_Count);
 	}
 };

@@ -554,7 +554,7 @@ void jedi_clear_timers(const gentity_t* ent)
 	TIMER_Set(ent, "blocking", 0);
 	TIMER_Set(ent, "regenerate", 0);
 	TIMER_Set(ent, "TalkTiming", 0);
-	TIMER_Set(ent, "KataTime", 0);
+	TIMER_Set(ent, "noKata", 0);
 	TIMER_Set(ent, "kyleTakesSaber", 0);
 	TIMER_Set(ent, "grasping", 0);
 }
@@ -9282,14 +9282,9 @@ static qboolean NPC_CanDoKata(gentity_t* self)
 		return qfalse;
 	}
 
-	if (self->NPC->lastKataTime > level.time)
+	// Cooldown
+	if (!TIMER_Done(NPC, "noKata"))
 	{
-		return qfalse;
-	}
-
-	if (!TIMER_Done(NPC, "KataTime"))
-	{
-		//still doin kata from last time
 		return qfalse;
 	}
 
@@ -9346,8 +9341,7 @@ static qboolean Jedi_CheckKataAttack()
 							{
 								ucmd.buttons |= BUTTON_ALT_ATTACK;
 							}
-							NPC->lastKataTime = level.time + Q_irand(6000, 10000);
-							TIMER_Set(NPC, "KataTime", Q_irand(5000, 7000));
+							TIMER_Set(NPC, "noKata", Q_irand(6000, 12000));
 							return qtrue;
 						}
 					}
@@ -9491,8 +9485,6 @@ Jedi_Attack
 // - TIMER_Set, TIMER_Done, Jedi_Move, Jedi_FaceEnemy, NPC_UpdateAngles
 // - ForceThrow, PM_SaberInBrokenParry, pm_saber_in_special_attack,
 //   PM_SpinningSaberAnim, PM_SaberInTransition, InFront, etc.
-// Also assumes you added to npcInfo_t:
-//   int kataDebounceTime;
 
 // =====================
 // Input Helpers
@@ -9727,7 +9719,7 @@ static qboolean Jedi_CanUseKata(gentity_t* self)
 	}
 
 	// Cooldown
-	if (NPCInfo->kataDebounceTime > level.time)
+	if (!TIMER_Done(NPC, "noKata"))
 	{
 		return qfalse;
 	}
@@ -9788,7 +9780,7 @@ static void JediHandleSpacing(gentity_t* self)
 								self->client->ps.saber_move = LS_SPINATTACK;   // Spin
 								break;
 							}
-							NPCInfo->kataDebounceTime = level.time + Q_irand(6000, 10000);
+							TIMER_Set(NPC, "noKata", Q_irand(6000, 12000));
 						}
 					}
 
@@ -9832,7 +9824,7 @@ static void JediHandleSpacing(gentity_t* self)
 					{
 						self->client->ps.saber_move = BOTH_LUNGE2_B__T_;
 						self->client->ps.weaponTime = level.time + 400;
-						NPCInfo->kataDebounceTime = level.time + Q_irand(6000, 10000);
+						TIMER_Set(NPC, "noKata", Q_irand(6000, 12000));
 					}
 				}
 
