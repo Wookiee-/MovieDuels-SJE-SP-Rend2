@@ -1,4 +1,4 @@
-/*
+ï»¿/*
 ===========================================================================
 Copyright (C) 2000 - 2013, Raven Software, Inc.
 Copyright (C) 2001 - 2013, Activision, Inc.
@@ -196,7 +196,7 @@ static qboolean In_field_of_vision(vec3_t viewangles, const float fov, vec3_t an
 	return qtrue;
 }
 
-qboolean npc_is_sith_lord(const gentity_t* self)
+static qboolean npc_is_sith_lord(const gentity_t* self)
 {
 	switch (self->client->NPC_class)
 	{
@@ -472,10 +472,10 @@ static qboolean npc_can_do_slap()
 		|| PM_SaberInBounce(NPC->client->ps.saber_move)
 		|| PM_SaberInKnockaway(NPC->client->ps.saber_move)
 		|| PM_SaberInBrokenParry(NPC->client->ps.saber_move)
-		|| g_AllowMawKick->integer < 1 && jedi_forbidden_kicker(NPC)
+		|| (g_AllowMawKick->integer < 1 && jedi_forbidden_kicker(NPC))
 		|| NPC->client->ps.groundEntityNum == ENTITYNUM_NONE
 		|| NPC->client->NPC_class == CLASS_YODA
-		|| g_SerenityJediEngineMode->integer == 2 && NPC->client->ps.blockPoints < BLOCKPOINTS_FIVE
+		|| (g_SerenityJediEngineMode->integer == 2 && NPC->client->ps.blockPoints < BLOCKPOINTS_FIVE)
 		|| NPC->client->ps.forcePower < BLOCKPOINTS_FIVE)
 	{
 		return qfalse;
@@ -501,6 +501,7 @@ static qboolean npc_can_do_slap()
 	{
 		return qtrue;
 	}
+
 	return qfalse;
 }
 
@@ -2198,6 +2199,183 @@ constexpr auto MELEE_DIST_SQUARED = 6400;
 qboolean jedi_saber_busy(const gentity_t* self);
 extern void AddNPCBlockPointBonus(const gentity_t* self);
 extern void WP_BlockPointsDrain(const gentity_t* self, int fatigue);
+/*
+===========================
+NPC_HandleSlapMelee
+
+Handles all slap/kick melee logic.
+Returns:
+	qtrue  = slap logic consumed the frame (caller should goto Nextsegment)
+	qfalse = continue normal combat logic
+===========================
+*/
+static qboolean NPC_HandleSlapMelee(gentity_t* NPC, gentity_t* enemy, int enemyDist)
+{
+	playerState_t* ps = &NPC->client->ps;
+
+	if (enemy == NULL)
+	{
+		return qfalse;
+	}
+	
+	qboolean in_melee_range = (qboolean)
+		((enemyDist <= MELEE_DIST_SQUARED) &&
+			(ps->weaponTime == 0) &&
+			(PM_InKnockDown(ps) == qfalse));
+
+	qboolean enemy_in_front = (qboolean)
+		InFront(enemy->currentOrigin, NPC->currentOrigin, ps->viewangles, 0.3f);
+
+	
+	qboolean enemy_behind = (qboolean)
+		(!enemy_in_front &&
+			!InFront(enemy->currentOrigin, NPC->currentOrigin, ps->viewangles, 0.25f));
+
+	// ------------------------------------------------------------
+	// 3. can_slap
+	// ------------------------------------------------------------
+	qboolean can_slap = (qboolean)
+		(g_spskill->integer > 1 &&
+		g_SerenityJediEngineMode->integer &&
+		!in_camera &&
+		npc_can_do_slap() &&
+		in_melee_range &&
+		!(ucmd.buttons & (BUTTON_ATTACK |
+			BUTTON_ALT_ATTACK |
+			BUTTON_FORCE_FOCUS |
+			BUTTON_USE |
+			BUTTON_BLOCK |
+			BUTTON_FORCE_LIGHTNING |
+			BUTTON_FORCEGRIP |
+			BUTTON_FORCEGRASP)) &&
+		(PM_InKnockDown(ps) == qfalse) &&
+		(Q_irand(0, 3) == 0));
+
+	if (can_slap == qfalse)
+	{
+		return qfalse;
+	}
+
+	// ------------------------------------------------------------
+	// 4. Already in slap/kick animation? Handle hit timing
+	// ------------------------------------------------------------
+	int anim = ps->torsoAnim;
+
+	qboolean in_slap_anim = (qboolean)
+		(anim == BOTH_A7_SLAP_R ||
+			anim == BOTH_A7_SLAP_L ||
+			anim == BOTH_A7_KICK_B ||
+			anim == BOTH_SWEEP_KICK ||
+			anim == BOTH_A7_HILT);
+
+	if (in_slap_anim == qtrue)
+	{
+		if (TIMER_Done(NPC, "smackTime") == qtrue &&
+			NPCInfo->blockedDebounceTime == 0)
+		{
+			if (in_melee_range == qtrue && enemy_in_front == qtrue)
+			{
+				vec3_t smack_dir;
+				VectorSubtract(enemy->currentOrigin, NPC->currentOrigin, smack_dir);
+				smack_dir[2] += 20;
+				VectorNormalize(smack_dir);
+
+				// Punch sound
+				G_Sound(enemy,
+					G_SoundIndex(va("sound/weapons/melee/punch%d", Q_irand(1, 4))));
+
+				// Pain sound
+				G_Sound(enemy,
+					G_SoundIndex(va("sound/chars/%s/misc/pain0%d",
+						enemy->NPC_type, Q_irand(1, 3))));
+
+				G_Damage(enemy, NPC, NPC, smack_dir, NPC->currentOrigin,
+					(g_spskill->integer + 1) * Q_irand(2, 5),
+					DAMAGE_NO_KNOCKBACK, MOD_MELEE);
+
+				WP_AbsorbKick(enemy, NPC, smack_dir);
+
+				NPCInfo->blockedDebounceTime = 1;
+			}
+		}
+
+		return qtrue; 
+	}
+
+	// ------------------------------------------------------------
+	// 5. Not in slap anim â€” decide which melee attack to start
+	// ------------------------------------------------------------
+	if (in_melee_range == qfalse)
+	{
+		return qfalse;
+	}
+
+	// FRONT SLAP
+	if (enemy_in_front == qtrue)
+	{
+		if (TIMER_Done(NPC, "attackDelay") == qtrue)
+		{
+			int swing_anim =
+				(NPC->health > BLOCKPOINTS_HALF)
+				? Q_irand(BOTH_A7_SLAP_L, BOTH_A7_SLAP_R)
+				: BOTH_A7_HILT;
+
+			G_Sound(enemy, G_SoundIndex(va("sound/weapons/melee/swing%d", Q_irand(1, 4))));
+			G_AddVoiceEvent(NPC, Q_irand(EV_COMBAT1, EV_COMBAT3), 12000);
+
+			NPC_SetAnim(NPC, SETANIM_BOTH, swing_anim,
+				SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+
+			if (ps->blockPoints > BLOCKPOINTS_THIRTY)
+			{
+				TIMER_Set(NPC, "attackDelay",
+					ps->torsoAnimTimer + Q_irand(20000, 30000));
+			}
+			else
+			{
+				TIMER_Set(NPC, "attackDelay",
+					ps->torsoAnimTimer + Q_irand(5000, 10000));
+			}
+
+			TIMER_Set(NPC, "smackTime", 300);
+			NPCInfo->blockedDebounceTime = 0;
+
+			return qtrue;
+		}
+	}
+	// BACK KICK
+	else if (enemy_behind == qtrue)
+	{
+		if (TIMER_Done(NPC, "attackDelay") == qtrue)
+		{
+			int swing_anim = Q_irand(BOTH_A7_KICK_B, BOTH_SWEEP_KICK);
+
+			G_Sound(enemy, G_SoundIndex(va("sound/weapons/melee/punch%d", Q_irand(1, 4))));
+			G_AddVoiceEvent(NPC, Q_irand(EV_COMBAT1, EV_COMBAT3), 12000);
+
+			NPC_SetAnim(NPC, SETANIM_BOTH, swing_anim,
+				SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+
+			if (NPC->health > BLOCKPOINTS_HALF)
+			{
+				TIMER_Set(NPC, "attackDelay",
+					ps->torsoAnimTimer + Q_irand(15000, 20000));
+			}
+			else
+			{
+				TIMER_Set(NPC, "attackDelay",
+					ps->torsoAnimTimer + Q_irand(5000, 10000));
+			}
+
+			TIMER_Set(NPC, "smackTime", 300);
+			NPCInfo->blockedDebounceTime = 0;
+
+			return qtrue;
+		}
+	}
+
+	return qfalse;     // no slap action taken
+}
 
 static void jedi_combat_distance(const int enemy_dist)
 {
@@ -2405,213 +2583,66 @@ static void jedi_combat_distance(const int enemy_dist)
 	if (!enemy)
 	{
 		enemyDist = Q3_INFINITE;
-		return;     // ? safest and simplest
+		goto Nextsegment;
 	}
 	else
 	{
 		enemyDist = DistanceSquared(NPC->currentOrigin, enemy->currentOrigin);
 	}
 
-	qboolean can_slap = (qboolean)(
-		g_spskill->integer > 1 &&
-		!in_camera &&
-		!Q_irand(0, 3) &&
-		g_SerenityJediEngineMode->integer &&
-		npc_can_do_slap() &&
-		!(ucmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK | BUTTON_FORCE_FOCUS |
-			BUTTON_USE | BUTTON_BLOCK | BUTTON_FORCE_LIGHTNING |
-			BUTTON_FORCEGRIP | BUTTON_FORCEGRASP)) &&
-		!PM_InKnockDown(&NPC->client->ps)
-		);
-
-	if (!can_slap)
+	// Slap/kick helper
+	if (NPC_HandleSlapMelee(NPC, enemy, enemyDist) == qtrue)
 	{
-		return;
+		goto Nextsegment;
 	}
 
-	// ----------------------------------------------------------------------
-	// Common melee-range conditions
-	// ----------------------------------------------------------------------
-	qboolean in_melee_range = (qboolean)(
-		(enemyDist < MELEE_DIST_SQUARED) &&
-		!NPC->client->ps.weaponTime &&
-		!PM_InKnockDown(&NPC->client->ps)
-		);
+Nextsegment:
 
-	qboolean enemy_in_front = (qboolean)
-		InFront(NPC->enemy->currentOrigin,
-			NPC->currentOrigin,
-			NPC->client->ps.viewangles,
-			0.3f);
+	// -----------------------------------------
+	// Force power movement locks
+	// -----------------------------------------
 
-	qboolean enemy_behind = (qboolean)(
-		!InFront(NPC->enemy->currentOrigin,
-			NPC->currentOrigin,
-			NPC->client->ps.viewangles,
-			-0.25f)
-		);
-
-	// ----------------------------------------------------------------------
-	// 1. If already in a slap/kick animation ? check for hit timing
-	// ----------------------------------------------------------------------
-	int anim = NPC->client->ps.torsoAnim;
-
-	bool in_slap_anim_bool =
-		anim == BOTH_A7_SLAP_R ||
-		anim == BOTH_A7_SLAP_L ||
-		anim == BOTH_A7_KICK_B ||
-		anim == BOTH_SWEEP_KICK ||
-		anim == BOTH_A7_HILT;
-
-	qboolean in_slap_anim = in_slap_anim_bool ? qtrue : qfalse;
-
-	if (in_slap_anim)
-	{
-		if (TIMER_Done(NPC, "smackTime") && !NPCInfo->blockedDebounceTime)
-		{
-			if (in_melee_range && enemy_in_front)
-			{
-				vec3_t smack_dir;
-				VectorSubtract(NPC->enemy->currentOrigin, NPC->currentOrigin, smack_dir);
-				smack_dir[2] += 20;
-				VectorNormalize(smack_dir);
-
-				// ? Play punch sound ONLY on actual hit
-				G_Sound(NPC->enemy,
-					G_SoundIndex(va("sound/weapons/melee/punch%d", Q_irand(1, 4))));
-
-				// Existing pain sound (keep it)
-				G_Sound(NPC->enemy,
-					G_SoundIndex(va("sound/chars/%s/misc/pain0%d",
-						NPC->enemy->NPC_type, Q_irand(1, 3))));
-
-				G_Damage(NPC->enemy, NPC, NPC, smack_dir, NPC->currentOrigin,
-					(g_spskill->integer + 1) * Q_irand(2, 5),
-					DAMAGE_NO_KNOCKBACK, MOD_MELEE);
-
-				WP_AbsorbKick(NPC->enemy, NPC, smack_dir);
-
-				NPCInfo->blockedDebounceTime = 1;
-			}
-		}
-		return;
-	}
-
-	// ----------------------------------------------------------------------
-	// 2. Not in slap anim ? decide which melee attack to start
-	// ----------------------------------------------------------------------
-	if (!in_melee_range)
-	{
-		return;
-	}
-
-	// FRONT SLAP
-	if (enemy_in_front)
-	{
-		if (TIMER_Done(NPC, "attackDelay"))
-		{
-			int swing_anim =
-				(NPC->health > BLOCKPOINTS_HALF)
-				? Q_irand(BOTH_A7_SLAP_L, BOTH_A7_SLAP_R)
-				: BOTH_A7_HILT;
-
-			G_Sound(NPC->enemy, G_SoundIndex(va("sound/weapons/melee/swing%d", Q_irand(1, 4))));
-			G_AddVoiceEvent(NPC, Q_irand(EV_COMBAT1, EV_COMBAT3), 12000);
-
-			NPC_SetAnim(NPC, SETANIM_BOTH, swing_anim,
-				SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
-
-			if (NPC->client->ps.blockPoints > BLOCKPOINTS_THIRTY)
-			{
-				TIMER_Set(NPC, "attackDelay",
-					NPC->client->ps.torsoAnimTimer + Q_irand(20000, 30000));
-			}
-			else
-			{
-				TIMER_Set(NPC, "attackDelay",
-					NPC->client->ps.torsoAnimTimer + Q_irand(5000, 10000));
-			}
-
-			TIMER_Set(NPC, "smackTime", 300);
-			NPCInfo->blockedDebounceTime = 0;
-		}
-	}
-	// BACK KICK
-	else if (enemy_behind)
-	{
-		if (TIMER_Done(NPC, "attackDelay"))
-		{
-			int swing_anim = Q_irand(BOTH_A7_KICK_B, BOTH_SWEEP_KICK);
-
-			G_Sound(NPC->enemy, G_SoundIndex(va("sound/weapons/melee/punch%d", Q_irand(1, 4))));
-			G_AddVoiceEvent(NPC, Q_irand(EV_COMBAT1, EV_COMBAT3), 12000);
-
-			NPC_SetAnim(NPC, SETANIM_BOTH, swing_anim,
-				SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
-
-			if (NPC->health > BLOCKPOINTS_HALF)
-			{
-				TIMER_Set(NPC, "attackDelay",
-					NPC->client->ps.torsoAnimTimer + Q_irand(15000, 20000));
-			}
-			else
-			{
-				TIMER_Set(NPC, "attackDelay",
-					NPC->client->ps.torsoAnimTimer + Q_irand(5000, 10000));
-			}
-
-			TIMER_Set(NPC, "smackTime", 300);
-			NPCInfo->blockedDebounceTime = 0;
-		}
-	}
-
-	///////////////////////////////////////////// end md stuff //////////////
-
-	if (NPC->client->ps.forcePowersActive & 1 << FP_GRIP &&
+	if ((NPC->client->ps.forcePowersActive & (1 << FP_GRIP)) &&
 		NPC->client->ps.forcePowerLevel[FP_GRIP] > FORCE_LEVEL_1)
 	{
-		//when gripping, don't move
-		return;
+		// When gripping, don't move â€” but DO NOT exit the function
+		goto EndOfFrame;
 	}
+
 	if (!TIMER_Done(NPC, "gripping"))
 	{
-		//stopped gripping, clear timers just in case
 		TIMER_Set(NPC, "gripping", -level.time);
 		TIMER_Set(NPC, "attackDelay", Q_irand(0, 1000));
 	}
 
-	if (NPC->client->ps.forcePowersActive & 1 << FP_GRASP &&
+	if ((NPC->client->ps.forcePowersActive & (1 << FP_GRASP)) &&
 		NPC->client->ps.forcePowerLevel[FP_GRASP] > FORCE_LEVEL_1)
 	{
-		//when grasping, don't move
-		return;
+		goto EndOfFrame;
 	}
 
 	if (!TIMER_Done(NPC, "grasping"))
 	{
-		//stopped grasping, clear timers just in case
 		TIMER_Set(NPC, "grasping", -level.time);
 		TIMER_Set(NPC, "attackDelay", Q_irand(0, 1000));
 	}
 
-	if (NPC->client->ps.forcePowersActive & 1 << FP_DRAIN &&
+	if ((NPC->client->ps.forcePowersActive & (1 << FP_DRAIN)) &&
 		NPC->client->ps.forcePowerLevel[FP_DRAIN] > FORCE_LEVEL_1)
 	{
-		//when draining, don't move
-		return;
+		goto EndOfFrame;
 	}
 
 	if (!TIMER_Done(NPC, "draining"))
 	{
-		//stopped draining, clear timers just in case
 		TIMER_Set(NPC, "draining", -level.time);
 		TIMER_Set(NPC, "attackDelay", Q_irand(0, 1000));
 	}
 
-	if (NPC->client->NPC_class == CLASS_BOBAFETT
-		|| NPC->client->NPC_class == CLASS_MANDALORIAN
-		|| NPC->client->NPC_class == CLASS_JANGO
-		|| NPC->client->NPC_class == CLASS_JANGODUAL)
+	if (NPC->client->NPC_class == CLASS_BOBAFETT ||
+		NPC->client->NPC_class == CLASS_MANDALORIAN ||
+		NPC->client->NPC_class == CLASS_JANGO ||
+		NPC->client->NPC_class == CLASS_JANGODUAL)
 	{
 		if (!TIMER_Done(NPC, "flameTime"))
 		{
@@ -2635,17 +2666,16 @@ static void jedi_combat_distance(const int enemy_dist)
 	}
 	else if (NPC->client->ps.legsAnim == BOTH_ALORA_SPIN_THROW)
 	{
-		//don't move at all
+		// Don't move at all â€” but DO NOT exit the function
+		goto EndOfFrame;
 	}
 	else if (NPC->client->ps.torsoAnim == BOTH_KYLE_GRAB)
 	{
-		//see if we grabbed enemy
 		if (NPC->client->ps.torsoAnimTimer <= 200)
 		{
-			if (kyle_can_do_grab()
-				&& NPC_EnemyRangeFromBolt(NPC->handRBolt) <= 72.0f)
+			if (kyle_can_do_grab() &&
+				NPC_EnemyRangeFromBolt(NPC->handRBolt) <= 72.0f)
 			{
-				//grab him!
 				if (g_SerenityJediEngineMode->integer == 2)
 				{
 					npc_grab_player();
@@ -2654,127 +2684,132 @@ static void jedi_combat_distance(const int enemy_dist)
 				{
 					kyle_grab_enemy();
 				}
-				return;
+				goto EndOfFrame;
 			}
-			NPC_SetAnim(NPC, SETANIM_BOTH, BOTH_KYLE_MISS, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+
+			NPC_SetAnim(NPC, SETANIM_BOTH, BOTH_KYLE_MISS,
+				SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
 			NPC->client->ps.weaponTime = NPC->client->ps.torsoAnimTimer;
-			return;
+			goto EndOfFrame;
 		}
-		//else just sit here?
-		return;
+
+		// Just sit here
+		goto EndOfFrame;
 	}
 	else if (NPC->client->ps.saberInFlight &&
-		!PM_SaberInBrokenParry(NPC->client->ps.saber_move)
-		&& NPC->client->ps.saberBlocked != BLOCKED_PARRY_BROKEN)
+		!PM_SaberInBrokenParry(NPC->client->ps.saber_move) &&
+		NPC->client->ps.saberBlocked != BLOCKED_PARRY_BROKEN)
 	{
-		//maintain distance
 		if (enemy_dist < NPC->client->ps.saberEntityDist)
 		{
 			jedi_retreat();
 		}
-		else if (enemy_dist > NPC->client->ps.saberEntityDist && enemy_dist > 100)
+		else if (enemy_dist > NPC->client->ps.saberEntityDist &&
+			enemy_dist > 100)
 		{
 			jedi_advance();
 		}
-		if (NPC->client->ps.weapon == WP_SABER //using saber
-			&& NPC->client->ps.saberEntityState == SES_LEAVING //not returning yet
-			&& NPC->client->ps.forcePowerLevel[FP_SABERTHROW] > FORCE_LEVEL_1 //2nd or 3rd level lightsaber
-			&& !(NPC->client->ps.forcePowersActive & 1 << FP_SPEED)
-			&& !(NPC->client->ps.forcePowersActive & 1 << FP_LIGHTNING)
-			&& !(NPC->client->ps.saberEventFlags & SEF_INWATER)) //saber not in water
+
+		if (NPC->client->ps.weapon == WP_SABER &&
+			NPC->client->ps.saberEntityState == SES_LEAVING &&
+			NPC->client->ps.forcePowerLevel[FP_SABERTHROW] > FORCE_LEVEL_1 &&
+			!(NPC->client->ps.forcePowersActive & (1 << FP_SPEED)) &&
+			!(NPC->client->ps.forcePowersActive & (1 << FP_LIGHTNING)) &&
+			!(NPC->client->ps.saberEventFlags & SEF_INWATER))
 		{
-			//hold it out there
 			ucmd.buttons |= BUTTON_ALT_ATTACK;
 		}
+
+		goto EndOfFrame;
 	}
 	else if (!TIMER_Done(NPC, "taunting"))
 	{
 		if (enemy_dist <= 64)
 		{
-			//he's getting too close
 			ucmd.buttons |= BUTTON_ATTACK;
+
 			if (!NPC->client->ps.saberInFlight)
 			{
 				NPC->client->ps.SaberActivate();
 			}
+
 			TIMER_Set(NPC, "taunting", -level.time);
 		}
-		else if (NPC->client->ps.torsoAnim == BOTH_GESTURE1 && NPC->client->ps.torsoAnimTimer < 2000)
+		else if (NPC->client->ps.torsoAnim == BOTH_GESTURE1 &&
+			NPC->client->ps.torsoAnimTimer < 2000)
 		{
-			//we're almost done with our special taunt
-			//FIXME: this doesn't always work, for some reason
 			if (!NPC->client->ps.saberInFlight)
 			{
 				NPC->client->ps.SaberActivate();
 			}
 		}
+
+		goto EndOfFrame;
 	}
 	else if (NPC->client->ps.saberEventFlags & SEF_LOCK_WON)
 	{
-		//we won a saber lock, press the advantage
 		if (enemy_dist > 0)
 		{
-			//get closer so we can hit!
 			jedi_advance();
 		}
+
 		if (enemy_dist > 128)
 		{
-			//lost 'em
 			NPC->client->ps.saberEventFlags &= ~SEF_LOCK_WON;
 		}
+
 		if (NPC->enemy->painDebounceTime + 2000 < level.time)
 		{
-			//the window of opportunity is gone
 			NPC->client->ps.saberEventFlags &= ~SEF_LOCK_WON;
 		}
-		//don't strafe?
+
 		TIMER_Set(NPC, "strafeLeft", -1);
 		TIMER_Set(NPC, "strafeRight", -1);
+
+		goto EndOfFrame;
 	}
-	else if (NPC->enemy->client
-		&& NPC->enemy->s.weapon == WP_SABER
-		&& NPC->enemy->client->ps.saberLockTime > level.time
-		&& NPC->client->ps.saberLockTime < level.time)
+	else if (NPC->enemy->client &&
+		NPC->enemy->s.weapon == WP_SABER &&
+		NPC->enemy->client->ps.saberLockTime > level.time &&
+		NPC->client->ps.saberLockTime < level.time)
 	{
-		//enemy is in a saberLock and we are not
 		if (enemy_dist < 64)
 		{
 			jedi_retreat();
 		}
+
+		goto EndOfFrame;
 	}
-	else if (NPC->enemy->s.weapon == WP_TURRET
-		&& !Q_stricmp("PAS", NPC->enemy->classname)
-		&& NPC->enemy->s.apos.trType == TR_STATIONARY)
+	else if (NPC->enemy->s.weapon == WP_TURRET &&
+		!Q_stricmp("PAS", NPC->enemy->classname) &&
+		NPC->enemy->s.apos.trType == TR_STATIONARY)
 	{
 		if (enemy_dist > forcePushPullRadius[FORCE_LEVEL_1] - 16)
 		{
 			jedi_advance();
 		}
-		int testlevel;
-		if (NPC->client->ps.forcePowerLevel[FP_PUSH] < FORCE_LEVEL_1)
-		{
-			//
-			testlevel = FORCE_LEVEL_1;
-		}
-		else
-		{
-			testlevel = NPC->client->ps.forcePowerLevel[FP_PUSH];
-		}
+
+		int testlevel = (NPC->client->ps.forcePowerLevel[FP_PUSH] < FORCE_LEVEL_1)
+			? FORCE_LEVEL_1
+			: NPC->client->ps.forcePowerLevel[FP_PUSH];
+
 		if (enemy_dist < forcePushPullRadius[testlevel] - 16)
 		{
-			//close enough to push
-			if (InFront(NPC->enemy->currentOrigin, NPC->client->renderInfo.eyePoint, NPC->client->renderInfo.eyeAngles,
+			if (InFront(NPC->enemy->currentOrigin,
+				NPC->client->renderInfo.eyePoint,
+				NPC->client->renderInfo.eyeAngles,
 				0.6f))
 			{
-				//knock it down
 				WP_KnockdownTurret(NPC);
-				//do the forcethrow call just for effect
+
 				if (g_SerenityJediEngineMode->integer)
 				{
-					if (NPC->client->NPC_class == CLASS_GALEN
-						&& (NPC->s.weapon == WP_MELEE || NPC->s.weapon == WP_NONE || NPC->s.weapon == WP_SABER && !
-							NPC->client->ps.SaberActive())
-						&& NPC->client->ps.groundEntityNum == ENTITYNUM_NONE)
+					if (NPC->client->NPC_class == CLASS_GALEN &&
+						(NPC->s.weapon == WP_MELEE ||
+							NPC->s.weapon == WP_NONE ||
+							(NPC->s.weapon == WP_SABER &&
+								!NPC->client->ps.SaberActive())) &&
+						NPC->client->ps.groundEntityNum == ENTITYNUM_NONE)
 					{
 						ForceRepulse(NPC, qfalse);
 					}
@@ -2789,48 +2824,49 @@ static void jedi_combat_distance(const int enemy_dist)
 				}
 			}
 		}
+
+		goto EndOfFrame;
 	}
 	else if (enemy_dist <= 64
 		&& (NPCInfo->scriptFlags & SCF_DONT_FIRE
 			|| !Q_stricmp("Yoda", NPC->NPC_type)
-			//|| !Q_stricmp("md_grogu", NPC->NPC_type)
-			/*|| !Q_stricmp("MD_Yoda", NPC->NPC_type)
-			|| !Q_stricmp("md_yoda_ep2", NPC->NPC_type)
-			|| !Q_stricmp("md_yod_mof", NPC->NPC_type)
-			|| !Q_stricmp("md_yoda_gd", NPC->NPC_type)*/
 			&& !Q_irand(0, 10)))
 	{
-		//can't use saber and they're in striking range
-		if (!Q_irand(0, 5) && InFront(NPC->enemy->currentOrigin, NPC->currentOrigin, NPC->client->ps.viewangles, 0.2f))
+		// can't use saber and they're in striking range
+		if (!Q_irand(0, 5) &&
+			InFront(NPC->enemy->currentOrigin, NPC->currentOrigin,
+				NPC->client->ps.viewangles, 0.2f))
 		{
-			if ((NPCInfo->scriptFlags & SCF_DONT_FIRE || NPC->max_health - NPC->health > NPC->max_health * 0.25f)
-				//lost over 1/4 of our health or not firing
-				&& WP_ForcePowerUsable(NPC, FP_DRAIN, 20) //know how to drain and have enough power
+			if ((NPCInfo->scriptFlags & SCF_DONT_FIRE ||
+				NPC->max_health - NPC->health > NPC->max_health * 0.25f)
+				&& WP_ForcePowerUsable(NPC, FP_DRAIN, 20)
 				&& !Q_irand(0, 2))
 			{
-				//drain
 				TIMER_Set(NPC, "draining", 3000);
 				TIMER_Set(NPC, "attackDelay", 3000);
 				jedi_advance();
-				return;
+				goto EndOfFrame;
 			}
+
 			if (jedi_decide_kick())
 			{
-				//let's try a kick
 				if (g_pick_auto_multi_kick(NPC, qfalse, qtrue) != LS_NONE
-					|| G_CanKickEntity(NPC, NPC->enemy) && G_PickAutoKick(NPC, NPC->enemy, qtrue) != LS_NONE)
+					|| (G_CanKickEntity(NPC, NPC->enemy) &&
+						G_PickAutoKick(NPC, NPC->enemy, qtrue) != LS_NONE))
 				{
-					//kicked!
-					TIMER_Set(NPC, "kickDebounce", Q_irand(3000, 10000));
-					return;
+					TIMER_Set(NPC, "kickDebounce", Q_irand(8000, 15000));
+					goto EndOfFrame;
 				}
 			}
+
 			if (g_SerenityJediEngineMode->integer)
 			{
-				if (NPC->client->NPC_class == CLASS_GALEN
-					&& (NPC->s.weapon == WP_MELEE || NPC->s.weapon == WP_NONE || NPC->s.weapon == WP_SABER && !
-						NPC->client->ps.SaberActive())
-					&& NPC->client->ps.groundEntityNum == ENTITYNUM_NONE)
+				if (NPC->client->NPC_class == CLASS_GALEN &&
+					(NPC->s.weapon == WP_MELEE ||
+						NPC->s.weapon == WP_NONE ||
+						(NPC->s.weapon == WP_SABER &&
+							!NPC->client->ps.SaberActive())) &&
+					NPC->client->ps.groundEntityNum == ENTITYNUM_NONE)
 				{
 					ForceRepulse(NPC, qfalse);
 				}
@@ -2844,128 +2880,121 @@ static void jedi_combat_distance(const int enemy_dist)
 				ForceThrow_JKA(NPC, qfalse);
 			}
 		}
+
 		jedi_retreat();
 	}
 	else if (enemy_dist <= 64
-		&& NPC->max_health - NPC->health > NPC->max_health * 0.25f //lost over 1/4 of our health
-		&& NPC->client->ps.forcePowersKnown & 1 << FP_DRAIN //know how to drain
-		&& WP_ForcePowerAvailable(NPC, FP_DRAIN, 20) //have enough power
+		&& NPC->max_health - NPC->health > NPC->max_health * 0.25f
+		&& (NPC->client->ps.forcePowersKnown & (1 << FP_DRAIN))
+		&& WP_ForcePowerAvailable(NPC, FP_DRAIN, 20)
 		&& !Q_irand(0, 10)
-		&& InFront(NPC->enemy->currentOrigin, NPC->currentOrigin, NPC->client->ps.viewangles, 0.2f))
+		&& InFront(NPC->enemy->currentOrigin, NPC->currentOrigin,
+			NPC->client->ps.viewangles, 0.2f))
 	{
 		TIMER_Set(NPC, "draining", 3000);
 		TIMER_Set(NPC, "attackDelay", 3000);
 		jedi_advance();
-		return;
+		goto EndOfFrame;
 	}
+
 	else if (enemy_dist <= -16)
 	{
-		//we're too damn close!
-		if (!Q_irand(0, 30)
-			&& kyle_can_do_grab())
+		if (!Q_irand(0, 30) && kyle_can_do_grab())
 		{
 			kyle_try_grab();
-			return;
 		}
-		if (NPC->client->ps.weapons[WP_SCEPTER]
-			&& !Q_irand(0, 20))
+
+		if (NPC->client->ps.weapons[WP_SCEPTER] && !Q_irand(0, 20))
 		{
 			tavion_start_scepter_slam();
-			return;
 		}
+
 		if (jedi_decide_kick())
 		{
-			//let's try a kick
 			if (g_pick_auto_multi_kick(NPC, qfalse, qtrue) != LS_NONE
-				|| G_CanKickEntity(NPC, NPC->enemy) && G_PickAutoKick(NPC, NPC->enemy, qtrue) != LS_NONE)
+				|| (G_CanKickEntity(NPC, NPC->enemy) &&
+					G_PickAutoKick(NPC, NPC->enemy, qtrue) != LS_NONE))
 			{
-				//kicked!
-				TIMER_Set(NPC, "kickDebounce", Q_irand(6000, 15000));
-				return;
+				TIMER_Set(NPC, "kickDebounce", Q_irand(8000, 15000));
 			}
 		}
+
 		jedi_retreat();
 	}
 	else if (enemy_dist <= 0)
 	{
-		//we're within striking range
-		//if we are attacking, see if we should stop
 		if (NPCInfo->stats.aggression < 4)
 		{
-			//back off and defend
-			if (!Q_irand(0, 30)
-				&& kyle_can_do_grab())
+			if (!Q_irand(0, 30) && kyle_can_do_grab())
 			{
 				kyle_try_grab();
-				return;
 			}
-			if (NPC->client->ps.weapons[WP_SCEPTER]
-				&& !Q_irand(0, 20))
+
+			if (NPC->client->ps.weapons[WP_SCEPTER] && !Q_irand(0, 20))
 			{
 				tavion_start_scepter_slam();
-				return;
 			}
+
 			if (jedi_decide_kick())
 			{
-				//let's try a kick
 				if (g_pick_auto_multi_kick(NPC, qfalse, qtrue) != LS_NONE
-					|| G_CanKickEntity(NPC, NPC->enemy) && G_PickAutoKick(NPC, NPC->enemy, qtrue) != LS_NONE)
+					|| (G_CanKickEntity(NPC, NPC->enemy) &&
+						G_PickAutoKick(NPC, NPC->enemy, qtrue) != LS_NONE))
 				{
-					//kicked!
-					TIMER_Set(NPC, "kickDebounce", Q_irand(3000, 10000));
-					return;
+					TIMER_Set(NPC, "kickDebounce", Q_irand(8000, 15000));
 				}
 			}
+
 			jedi_retreat();
 		}
 	}
 	else if (enemy_dist > 256)
 	{
-		//we're way out of range
 		qboolean used_force = qfalse;
+
 		if (NPCInfo->stats.aggression < Q_irand(0, 20)
 			&& NPC->health < NPC->max_health * 0.75f
 			&& !Q_irand(0, 2))
 		{
-			if (NPC->enemy
-				&& NPC->enemy->s.number < MAX_CLIENTS
-				&& NPC->client->NPC_class != CLASS_KYLE
-				&& (NPCInfo->aiFlags & NPCAI_BOSS_CHARACTER
-					|| NPC->client->NPC_class == CLASS_SHADOWTROOPER)
-				&& Q_irand(0, 3 - g_spskill->integer))
+			if (NPC->enemy &&
+				NPC->enemy->s.number < MAX_CLIENTS &&
+				NPC->client->NPC_class != CLASS_KYLE &&
+				(NPCInfo->aiFlags & NPCAI_BOSS_CHARACTER ||
+					NPC->client->NPC_class == CLASS_SHADOWTROOPER) &&
+				Q_irand(0, 3 - g_spskill->integer))
 			{
-				//hmm, bosses should do this less against the player
+				// bosses do this less
 			}
-			else if (NPC->client->ps.saber[0].type == SABER_SITH_SWORD
-				&& NPC->weaponModel[0] != -1)
+			else if (NPC->client->ps.saber[0].type == SABER_SITH_SWORD &&
+				NPC->weaponModel[0] != -1)
 			{
 				tavion_sith_sword_recharge();
 				used_force = qtrue;
 			}
-			else if ((NPC->client->ps.forcePowersKnown & 1 << FP_HEAL) != 0
-				&& (NPC->client->ps.forcePowersActive & 1 << FP_HEAL) == 0
-				&& Q_irand(0, 1))
+			else if ((NPC->client->ps.forcePowersKnown & (1 << FP_HEAL)) &&
+				!(NPC->client->ps.forcePowersActive & (1 << FP_HEAL)) &&
+				Q_irand(0, 1))
 			{
 				ForceHeal(NPC);
 				used_force = qtrue;
 			}
-			else if ((NPC->client->ps.forcePowersKnown & 1 << FP_PROTECT) != 0
-				&& (NPC->client->ps.forcePowersActive & 1 << FP_PROTECT) == 0
-				&& Q_irand(0, 1))
+			else if ((NPC->client->ps.forcePowersKnown & (1 << FP_PROTECT)) &&
+				!(NPC->client->ps.forcePowersActive & (1 << FP_PROTECT)) &&
+				Q_irand(0, 1))
 			{
 				ForceProtect(NPC);
 				used_force = qtrue;
 			}
-			else if ((NPC->client->ps.forcePowersKnown & 1 << FP_ABSORB) != 0
-				&& (NPC->client->ps.forcePowersActive & 1 << FP_ABSORB) == 0
-				&& Q_irand(0, 1))
+			else if ((NPC->client->ps.forcePowersKnown & (1 << FP_ABSORB)) &&
+				!(NPC->client->ps.forcePowersActive & (1 << FP_ABSORB)) &&
+				Q_irand(0, 1))
 			{
 				ForceAbsorb(NPC);
 				used_force = qtrue;
 			}
-			else if ((NPC->client->ps.forcePowersKnown & 1 << FP_RAGE) != 0
-				&& (NPC->client->ps.forcePowersActive & 1 << FP_RAGE) == 0
-				&& Q_irand(0, 1))
+			else if ((NPC->client->ps.forcePowersKnown & (1 << FP_RAGE)) &&
+				!(NPC->client->ps.forcePowersActive & (1 << FP_RAGE)) &&
+				Q_irand(0, 1))
 			{
 				jedi_rage();
 				used_force = qtrue;
@@ -2973,29 +3002,29 @@ static void jedi_combat_distance(const int enemy_dist)
 		}
 		if (enemy_dist > 384)
 		{
-			//FIXME: check for enemy facing away and/or moving away
-			if (!Q_irand(0, 10) && NPCInfo->blockedSpeechDebounceTime < level.time && jediSpeechDebounceTime[NPC->client
-				->playerTeam] < level.time)
+			if (!Q_irand(0, 10) &&
+				NPCInfo->blockedSpeechDebounceTime < level.time &&
+				jediSpeechDebounceTime[NPC->client->playerTeam] < level.time)
 			{
 				if (NPC_ClearLOS(NPC->enemy))
 				{
 					G_AddVoiceEvent(NPC, Q_irand(EV_JCHASE1, EV_JCHASE3), 3000);
 				}
-				jediSpeechDebounceTime[NPC->client->playerTeam] = NPCInfo->blockedSpeechDebounceTime = level.time + 3000;
+
+				jediSpeechDebounceTime[NPC->client->playerTeam] =
+					NPCInfo->blockedSpeechDebounceTime = level.time + 3000;
 			}
 		}
-		//Unless we're totally hiding, go after him
+
 		if (NPCInfo->stats.aggression > 0)
 		{
-			//approach enemy
 			if (!used_force)
 			{
-				if (NPC->enemy
-					&& NPC->enemy->client
-					&& (NPC->enemy->client->ps.torsoAnim == BOTH_SPINATTACK6
-						|| NPC->enemy->client->ps.torsoAnim == BOTH_SPINATTACK7))
+				if (NPC->enemy && NPC->enemy->client &&
+					(NPC->enemy->client->ps.torsoAnim == BOTH_SPINATTACK6 ||
+						NPC->enemy->client->ps.torsoAnim == BOTH_SPINATTACK7))
 				{
-					//stay put!
+					// stay put
 				}
 				else
 				{
@@ -3230,13 +3259,6 @@ static void jedi_combat_distance(const int enemy_dist)
 				if (chance_scale
 					&& (enemy_dist > Q_irand(100, 200) || NPCInfo->scriptFlags & SCF_DONT_FIRE
 						|| !Q_stricmp("Yoda", NPC->NPC_type)
-						/*|| !Q_stricmp("MD_Yoda", NPC->NPC_type)
-						|| !Q_stricmp("md_yoda_ep2", NPC->NPC_type)
-						|| !Q_stricmp("md_yod_mof", NPC->NPC_type)
-						|| !Q_stricmp("md_yoda_gd", NPC->NPC_type)
-						|| !Q_stricmp("md_yoda_ot", NPC->NPC_type)
-						|| !Q_stricmp("md_yoda_hr", NPC->NPC_type)
-						|| !Q_stricmp("md_grogu", NPC->NPC_type)*/
 						&& !Q_irand(0, 3))
 					&& enemy_dist < 500
 					&& (Q_irand(0, chance_scale * 10) < 5 || NPC->enemy->client && NPC->enemy->client->ps.weapon !=
@@ -3370,7 +3392,6 @@ static void jedi_combat_distance(const int enemy_dist)
 							TIMER_Set(NPC, "grasping", 3000);
 							TIMER_Set(NPC, "attackDelay", 3000);
 						}
-						/////////  FP_GRASP ////////////////////////////
 						////////////////////  New ForcePowers end ///////////////////////////
 
 						//////////////// FP_GRIP /////////////////////////
@@ -3457,62 +3478,57 @@ static void jedi_combat_distance(const int enemy_dist)
 	}
 	else
 	{
-		//we're not close enough to attack, but not far enough away to be safe
-		if (!Q_irand(0, 30)
-			&& kyle_can_do_grab())
+		if (!Q_irand(0, 30) && kyle_can_do_grab())
 		{
 			kyle_try_grab();
-			return;
+			goto EndOfFrame;
 		}
+
 		if (NPCInfo->stats.aggression < 4)
 		{
-			//back off and defend
 			if (jedi_decide_kick())
 			{
-				//let's try a kick
 				if (g_pick_auto_multi_kick(NPC, qfalse, qtrue) != LS_NONE
-					|| G_CanKickEntity(NPC, NPC->enemy) && G_PickAutoKick(NPC, NPC->enemy, qtrue) != LS_NONE)
+					|| (G_CanKickEntity(NPC, NPC->enemy) &&
+						G_PickAutoKick(NPC, NPC->enemy, qtrue) != LS_NONE))
 				{
-					//kicked!
-					TIMER_Set(NPC, "kickDebounce", Q_irand(3000, 10000));
-					return;
+					TIMER_Set(NPC, "kickDebounce", Q_irand(8000, 15000));
+					goto EndOfFrame;
 				}
 			}
+
 			jedi_retreat();
 		}
 		else if (NPCInfo->stats.aggression > 5)
 		{
-			//try to get closer
 			if (enemy_dist > 0 && !(NPCInfo->scriptFlags & SCF_DONT_FIRE))
 			{
-				//we're allowed to use our lightsaber, get closer
 				if (TIMER_Done(NPC, "parryTime") || NPCInfo->rank > RANK_LT)
 				{
-					//not parrying
-					if (!NPC->enemy->client || NPC->enemy->client->ps.groundEntityNum != ENTITYNUM_NONE)
+					if (!NPC->enemy->client ||
+						NPC->enemy->client->ps.groundEntityNum != ENTITYNUM_NONE)
 					{
-						//they're on the ground, so advance
 						jedi_advance();
 					}
 				}
 			}
 		}
-		else
-		{
-			//Move forward and back?
-		}
 	}
-	//if really really mad, rage!
-	if (enemy_dist > 1024 && NPCInfo->stats.aggression > Q_irand(5, 15)
-		&& NPC->health < NPC->max_health * 0.75f
-		&& !Q_irand(0, 2))
+
+	// really mad â†’ rage
+	if (enemy_dist > 1024 &&
+		NPCInfo->stats.aggression > Q_irand(5, 15) &&
+		NPC->health < NPC->max_health * 0.75f &&
+		!Q_irand(0, 2))
 	{
-		if ((NPC->client->ps.forcePowersKnown & 1 << FP_RAGE) != 0
-			&& (NPC->client->ps.forcePowersActive & 1 << FP_RAGE) == 0)
+		if ((NPC->client->ps.forcePowersKnown & (1 << FP_RAGE)) &&
+			!(NPC->client->ps.forcePowersActive & (1 << FP_RAGE)))
 		{
 			jedi_rage();
 		}
 	}
+EndOfFrame:
+	return;
 }
 
 static qboolean Jedi_Strafe(const int strafe_time_min, const int strafe_time_max, const int next_strafe_time_min,
@@ -4792,7 +4808,7 @@ NOTE: always blocking projectiles in this func!
 extern qboolean G_FindClosestPointOnLineSegment(const vec3_t start, const vec3_t end, const vec3_t from, vec3_t result);
 
 // ============================
-// SECTION 1 — Setup & Early Outs
+// SECTION 1 â€” Setup & Early Outs
 // ============================
 evasionType_t jedi_saber_block_go(gentity_t* self, usercmd_t* cmd, vec3_t p_hitloc, vec3_t phit_dir,
 	const gentity_t* incoming, float dist = 0.0f)
@@ -4956,7 +4972,7 @@ evasionType_t jedi_saber_block_go(gentity_t* self, usercmd_t* cmd, vec3_t p_hitl
 	}
 
 	// ============================
-	// SECTION 2 — Upper-Tier Evasion Logic (Enhanced Blocking Version)
+	// SECTION 2 â€” Upper-Tier Evasion Logic (Enhanced Blocking Version)
 	// ============================
 
 	qboolean do_roll = qfalse;
@@ -4966,7 +4982,7 @@ evasionType_t jedi_saber_block_go(gentity_t* self, usercmd_t* cmd, vec3_t p_hitl
 		|| (self->client->NPC_class == CLASS_CALONORD && self->s.weapon != WP_SABER)
 		|| (self->client->NPC_class == CLASS_GROGU && self->s.weapon != WP_SABER)
 		|| (self->client->NPC_class == CLASS_SITHLORD && self->s.weapon != WP_SABER))
-		&& !Q_irand(0, 5))   // was 0–2 ? now much rarer
+		&& !Q_irand(0, 5))   // was 0â€“2 ? now much rarer
 	{
 		do_roll = qtrue;
 	}
@@ -5126,7 +5142,7 @@ evasionType_t jedi_saber_block_go(gentity_t* self, usercmd_t* cmd, vec3_t p_hitl
 		}
 	}
 	// ============================
-	// SECTION 3 — Mid-Tier Evasion Logic (Cinematic Jedi Master)
+	// SECTION 3 â€” Mid-Tier Evasion Logic (Cinematic Jedi Master)
 	// ============================
 
 	else if (zdiff > -22)
@@ -5179,7 +5195,7 @@ evasionType_t jedi_saber_block_go(gentity_t* self, usercmd_t* cmd, vec3_t p_hitl
 		if (incoming || !saber_busy || always_dodge_or_roll)
 		{
 			// ============================
-// MID — RIGHT-SIDE ATTACK
+// MID â€” RIGHT-SIDE ATTACK
 // ============================
 			if (rightdot > 8 || (rightdot > 3 && zdiff < -11)
 				|| (!incoming && fabs(hitdir[2]) < 0.25f))
@@ -5232,7 +5248,7 @@ evasionType_t jedi_saber_block_go(gentity_t* self, usercmd_t* cmd, vec3_t p_hitl
 			}
 
 			// ============================
-			// MID — LEFT-SIDE ATTACK
+			// MID â€” LEFT-SIDE ATTACK
 			// ============================
 			else if (rightdot < -8 || (rightdot < -3 && zdiff < -11)
 				|| (!incoming && fabs(hitdir[2]) < 0.25f))
@@ -5283,7 +5299,7 @@ evasionType_t jedi_saber_block_go(gentity_t* self, usercmd_t* cmd, vec3_t p_hitl
 			}
 
 			// ============================
-			// MID — FRONT / OVERHEAD ATTACK
+			// MID â€” FRONT / OVERHEAD ATTACK
 			// ============================
 			else
 			{
@@ -5323,7 +5339,7 @@ evasionType_t jedi_saber_block_go(gentity_t* self, usercmd_t* cmd, vec3_t p_hitl
 			}
 		}
 	}// ============================
-	 // SECTION 4 — Low / Very-Low Evasion Logic (Cinematic Jedi Master)
+	 // SECTION 4 â€” Low / Very-Low Evasion Logic (Cinematic Jedi Master)
 	 // ============================
 
 	else
@@ -5554,7 +5570,7 @@ evasionType_t jedi_saber_block_go(gentity_t* self, usercmd_t* cmd, vec3_t p_hitl
 	}
 
 	// ============================
-	// SECTION 5 — Finalization & Post-Evasion Handling
+	// SECTION 5 â€” Finalization & Post-Evasion Handling
 	// ============================
 
 	if (evasion_type == EVASION_NONE)
@@ -6526,12 +6542,14 @@ static void Jedi_EvasionSaber(vec3_t enemy_movedir, const float enemy_dist, vec3
 			case 1:
 			case 2:
 			case 3:
-				if (jedi_decide_kick() //let's try a kick
-					&& (g_pick_auto_multi_kick(NPC, qfalse, qtrue) != LS_NONE
-						|| G_CanKickEntity(NPC, NPC->enemy) && G_PickAutoKick(NPC, NPC->enemy, qtrue) != LS_NONE))
+				if (jedi_decide_kick())
 				{
-					//kicked
-					TIMER_Set(NPC, "kickDebounce", Q_irand(6000, 15000));
+					if (g_pick_auto_multi_kick(NPC, qfalse, qtrue) != LS_NONE
+						|| (G_CanKickEntity(NPC, NPC->enemy) &&
+							G_PickAutoKick(NPC, NPC->enemy, qtrue) != LS_NONE))
+					{
+						TIMER_Set(NPC, "kickDebounce", Q_irand(8000, 15000));
+					}
 				}
 				else if ((NPCInfo->rank == RANK_ENSIGN || NPCInfo->rank > RANK_LT_JG) && TIMER_Done(NPC, "parryTime"))
 				{
@@ -9318,7 +9336,7 @@ static qboolean Jedi_CheckKataAttack()
 					if (ucmd.upmove <= 0 && NPC->client->ps.forceJumpCharge <= 0)
 					{
 						//not going to try to jump
-						
+
 						// Special attack frequency modifier
 						float freqMod = Com_Clamp(0.0f, 1.0f, g_npcSpecialAttackFreq->value);
 						bool doSpecial = false;
@@ -9749,7 +9767,7 @@ static void JediHandleSpacing(gentity_t* self)
 		// Do NOT allow jump-ins during cinematic camera
 		if (!in_camera)
 		{
-			// Only attempt a jump-in every 2–4 seconds
+			// Only attempt a jump-in every 2â€“4 seconds
 			if (level.time >= self->NPC->jumpTime)
 			{
 				// 1 in 20 chance per attempt
@@ -9784,7 +9802,7 @@ static void JediHandleSpacing(gentity_t* self)
 						}
 					}
 
-					// Set next allowed jump-in time (2–4 seconds)
+					// Set next allowed jump-in time (2â€“4 seconds)
 					self->NPC->jumpTime = level.time + Q_irand(2000, 4000);
 
 					return;
@@ -9802,7 +9820,7 @@ static void JediHandleSpacing(gentity_t* self)
 	}
 
 	// =====================================================
-	// 2. Mid-range: Dash-in lunges (200–350 units)
+	// 2. Mid-range: Dash-in lunges (200â€“350 units)
 	// =====================================================
 	if (dist > 200.0f)
 	{
@@ -9828,7 +9846,7 @@ static void JediHandleSpacing(gentity_t* self)
 					}
 				}
 
-				// Set next allowed jump-in time (2–4 seconds)
+				// Set next allowed jump-in time (2â€“4 seconds)
 				self->NPC->jumpTime = level.time + Q_irand(2000, 4000);
 
 				return;
@@ -9845,7 +9863,7 @@ static void JediHandleSpacing(gentity_t* self)
 	}
 
 	// =====================================================
-	// 3. Close-range: Circle-strafe approach (80–200 units)
+	// 3. Close-range: Circle-strafe approach (80â€“200 units)
 	// =====================================================
 	vec3_t pvel;
 	VectorCopy(self->enemy->client->ps.velocity, pvel);
@@ -9903,7 +9921,7 @@ static void JediHandleSpacing(gentity_t* self)
 	}
 
 	// =====================================================
-	// 5. Ideal range — do nothing
+	// 5. Ideal range â€” do nothing
 	// =====================================================
 	// Let attack logic take over
 }
@@ -11410,7 +11428,7 @@ static qboolean jedi_in_special_move()
 
 				if (!rosh->client)
 				{
-					// Rosh exists but has no client – nothing to do here
+					// Rosh exists but has no client â€“ nothing to do here
 					NPC_UpdateAngles(qtrue, qtrue);
 					return qtrue;
 				}

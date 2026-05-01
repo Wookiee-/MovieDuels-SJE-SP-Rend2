@@ -32087,8 +32087,8 @@ void ForceLightning(gentity_t* self)
 			return;
 		}
 
-		if (self->client->ps.weaponTime > 0	&&
-			(!PM_SaberInParry(self->client->ps.saber_move) || 
+		if (self->client->ps.weaponTime > 0 &&
+			(!PM_SaberInParry(self->client->ps.saber_move) ||
 				!(self->client->ps.userInt3 & 1 << FLAG_PREBLOCK)))
 		{
 			return;
@@ -32811,11 +32811,12 @@ static void ForceLightningDamage(gentity_t* self, gentity_t* traceEnt, vec3_t di
 						G_ControlledByPlayer(traceEnt)) &&
 					traceEnt->s.weapon != WP_EMPLACED_GUN)
 				{
-					if ((PM_RunningAnim(traceEnt->client->ps.legsAnim) ||
-						PM_SaberInKata(static_cast<saber_moveName_t>(self->client->ps.saber_move)) ||
-						PM_InKataAnim(self->client->ps.torsoAnim) ||
-						(is_class_guard == qtrue)) &&
-						traceEnt->health > 1)
+					if (traceEnt->client &&
+						traceEnt->health > 1 &&
+						(PM_RunningAnim(traceEnt->client->ps.legsAnim) ||
+							PM_SaberInKata(static_cast<saber_moveName_t>(traceEnt->client->ps.saber_move)) ||
+							PM_InKataAnim(traceEnt->client->ps.torsoAnim) ||
+							is_class_guard == qtrue))
 					{
 						G_KnockOver(traceEnt, self, dir, 25, qtrue);
 					}
@@ -33642,11 +33643,12 @@ static void ForceLightningDamage_AMD(gentity_t* self, gentity_t* traceEnt, vec3_
 						gentity_t* tent = G_TempEntity(traceEnt->currentOrigin, EV_STUNNED);
 						tent->owner = traceEnt;
 					}
-					if ((PM_RunningAnim(traceEnt->client->ps.legsAnim) ||
-						PM_SaberInKata(static_cast<saber_moveName_t>(self->client->ps.saber_move)) ||
-						PM_InKataAnim(self->client->ps.torsoAnim) ||
-						(is_class_guard == qtrue)) &&
-						traceEnt->health > 1)
+					if (traceEnt->client &&
+						traceEnt->health > 1 &&
+						(PM_RunningAnim(traceEnt->client->ps.legsAnim) ||
+							PM_SaberInKata(static_cast<saber_moveName_t>(traceEnt->client->ps.saber_move)) ||
+							PM_InKataAnim(traceEnt->client->ps.torsoAnim) ||
+							is_class_guard == qtrue))
 					{
 						G_KnockOver(traceEnt, self, dir, 25, qtrue);
 					}
@@ -33734,8 +33736,7 @@ static void ForceLightningDamage_AMD(gentity_t* self, gentity_t* traceEnt, vec3_
 	}
 }
 
-static void ForceLightningDamage_MD(gentity_t* self, gentity_t* traceEnt, vec3_t dir, const float dist, const float dot,
-	vec3_t impact_point)
+static void ForceLightningDamage_MD(gentity_t* self, gentity_t* traceEnt, vec3_t dir, const float dist, const float dot, vec3_t impact_point)
 {
 	qboolean lightning_blocked = qfalse;
 	qboolean is_class_guard = qfalse;
@@ -34381,11 +34382,12 @@ static void ForceLightningDamage_MD(gentity_t* self, gentity_t* traceEnt, vec3_t
 						tent->owner = traceEnt;
 					}
 
-					if ((PM_RunningAnim(traceEnt->client->ps.legsAnim) ||
-						PM_SaberInKata(static_cast<saber_moveName_t>(self->client->ps.saber_move)) ||
-						PM_InKataAnim(self->client->ps.torsoAnim) ||
-						(is_class_guard == qtrue)) &&
-						traceEnt->health > 1)
+					if (traceEnt->client &&
+						traceEnt->health > 1 &&
+						(PM_RunningAnim(traceEnt->client->ps.legsAnim) ||
+							PM_SaberInKata(static_cast<saber_moveName_t>(traceEnt->client->ps.saber_move)) ||
+							PM_InKataAnim(traceEnt->client->ps.torsoAnim) ||
+							is_class_guard == qtrue))
 					{
 						G_KnockOver(traceEnt, self, dir, 25, qtrue);
 					}

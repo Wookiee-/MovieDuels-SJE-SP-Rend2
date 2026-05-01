@@ -5977,7 +5977,6 @@ void PM_SaberStartTransAnim(const int saberAnimLevel,
 	}
 }
 
-
 extern qboolean player_locked;
 extern qboolean PlayerAffectedByStasis();
 extern qboolean MatrixMode;

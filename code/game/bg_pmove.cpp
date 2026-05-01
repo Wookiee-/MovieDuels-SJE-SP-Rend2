@@ -2315,7 +2315,19 @@ static qboolean PM_CheckJump()
 							|| anim == BOTH_WALL_FLIP_BACK1)
 						{
 							pm->ps->velocity[0] = pm->ps->velocity[1] = 0;
-							VectorMA(pm->ps->velocity, -150, fwd, pm->ps->velocity);
+							vec3_t move_dir{};
+							// prefer the projected forward vector (aligned with movement/ground), not camera
+							move_dir[0] = pml.forward[0];
+							move_dir[1] = pml.forward[1];
+							move_dir[2] = 0.0f;
+							if (VectorLengthSquared(move_dir) < 0.0001f)
+							{// fallback to the original view-based forward but projected to ground (no vertical)
+								move_dir[0] = fwd[0];
+								move_dir[1] = fwd[1];
+								move_dir[2] = 0.0f;
+							}
+							VectorNormalize(move_dir);
+							VectorMA(pm->ps->velocity, -150.0f, move_dir, pm->ps->velocity);
 						}
 						//kick if jumping off an ent
 						if (do_trace
@@ -15223,7 +15235,7 @@ saber_moveName_t PM_NPCSaberAttackFromQuad(const int quad)
 		(pm->gent->client->NPC_class != CLASS_VADER))
 	{
 		if (g_spskill->integer > 1
-			&& G_EnoughPowerForSpecialMove(pm->ps->forcePower, SABER_KATA_ATTACK_POWER)
+			&& G_EnoughPowerForSpecialMove(pm->ps->forcePower, SPECIAL_NPC_ATTACK) //reduced cost for NPCs
 			&& !pm->ps->forcePowersActive
 			&& !in_camera)
 		{
@@ -15393,8 +15405,7 @@ saber_moveName_t PM_NPCSaberAttackFromQuad(const int quad)
 					check_val = 1;
 				}
 
-				Next_Kill_Attack_Move_Check[pm->ps->clientNum] =
-					level.time + (90000 / check_val); // 20 secs / g_attackskill->integer
+				Next_Kill_Attack_Move_Check[pm->ps->clientNum] = level.time + (90000 / check_val); // 20 secs  g_attackskill->integer
 			}
 		}
 	}
@@ -16493,10 +16504,13 @@ qboolean G_CanKickEntity(const gentity_t* self, const gentity_t* target)
 	if (target && target->client
 		&& !PM_InKnockDown(&target->client->ps)
 		&& !PM_SaberInMassiveBounce(self->client->ps.torsoAnim)
-		&& G_EnemyInKickRange(self, target))
+		&& G_EnemyInKickRange(self, target)
+		&& ((target->client->ps.weapon == WP_SABER && target->client->ps.saberFatigueChainCount < MISHAPLEVEL_HEAVY) ||
+			(target->client->ps.weapon != WP_SABER && target->client->ps.BlasterAttackChainCount < BLASTERMISHAPLEVEL_HEAVY)))
 	{
 		return qtrue;
 	}
+
 	return qfalse;
 }
 

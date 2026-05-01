@@ -187,6 +187,8 @@ constexpr auto FORCE_LONG_LEAP_SPEED = 475.0f; //300;
 
 constexpr auto SABER_KATA_ATTACK_POWER = 80; //75?;
 
+constexpr auto SPECIAL_NPC_ATTACK = 60;;
+
 constexpr auto SABER_ALT_ATTACK_POWER = 50; //75?;
 constexpr auto SABER_ALT_ATTACK_POWER_LR = 10; //30?;
 constexpr auto SABER_ALT_ATTACK_POWER_FB = 25; //30/50?;
