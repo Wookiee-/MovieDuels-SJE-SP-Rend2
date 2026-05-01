@@ -2193,8 +2193,6 @@ static qboolean kyle_can_do_grab()
 }
 
 extern qboolean PM_CrouchAnim(const int anim);
-static qboolean shoot;
-static float enemyDist;
 constexpr auto MELEE_DIST_SQUARED = 6400;
 qboolean jedi_saber_busy(const gentity_t* self);
 extern void AddNPCBlockPointBonus(const gentity_t* self);
@@ -2205,7 +2203,7 @@ NPC_HandleSlapMelee
 
 Handles all slap/kick melee logic.
 Returns:
-	qtrue  = slap logic consumed the frame (caller should goto Nextsegment)
+	qtrue  = slap logic consumed the frame
 	qfalse = continue normal combat logic
 ===========================
 */
@@ -2577,26 +2575,14 @@ static void jedi_combat_distance(const int enemy_dist)
 		}
 	}
 
-	// SLAP
-	shoot = qfalse;
-
-	if (!enemy)
+	// -----------------------------------------
+	// Slap/kick
+	// -----------------------------------------
+	if (NPC_HandleSlapMelee(NPC, enemy, enemy_dist) == qtrue)
 	{
-		enemyDist = Q3_INFINITE;
-		goto Nextsegment;
+		// Doing a slap/kick
+		return;
 	}
-	else
-	{
-		enemyDist = DistanceSquared(NPC->currentOrigin, enemy->currentOrigin);
-	}
-
-	// Slap/kick helper
-	if (NPC_HandleSlapMelee(NPC, enemy, enemyDist) == qtrue)
-	{
-		goto Nextsegment;
-	}
-
-Nextsegment:
 
 	// -----------------------------------------
 	// Force power movement locks
@@ -2606,7 +2592,7 @@ Nextsegment:
 		NPC->client->ps.forcePowerLevel[FP_GRIP] > FORCE_LEVEL_1)
 	{
 		// When gripping, don't move — but DO NOT exit the function
-		goto EndOfFrame;
+		return;
 	}
 
 	if (!TIMER_Done(NPC, "gripping"))
@@ -2618,7 +2604,7 @@ Nextsegment:
 	if ((NPC->client->ps.forcePowersActive & (1 << FP_GRASP)) &&
 		NPC->client->ps.forcePowerLevel[FP_GRASP] > FORCE_LEVEL_1)
 	{
-		goto EndOfFrame;
+		return;
 	}
 
 	if (!TIMER_Done(NPC, "grasping"))
@@ -2630,7 +2616,7 @@ Nextsegment:
 	if ((NPC->client->ps.forcePowersActive & (1 << FP_DRAIN)) &&
 		NPC->client->ps.forcePowerLevel[FP_DRAIN] > FORCE_LEVEL_1)
 	{
-		goto EndOfFrame;
+		return;
 	}
 
 	if (!TIMER_Done(NPC, "draining"))
@@ -2667,7 +2653,7 @@ Nextsegment:
 	else if (NPC->client->ps.legsAnim == BOTH_ALORA_SPIN_THROW)
 	{
 		// Don't move at all — but DO NOT exit the function
-		goto EndOfFrame;
+		return;
 	}
 	else if (NPC->client->ps.torsoAnim == BOTH_KYLE_GRAB)
 	{
@@ -2684,17 +2670,17 @@ Nextsegment:
 				{
 					kyle_grab_enemy();
 				}
-				goto EndOfFrame;
+				return;
 			}
 
 			NPC_SetAnim(NPC, SETANIM_BOTH, BOTH_KYLE_MISS,
 				SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
 			NPC->client->ps.weaponTime = NPC->client->ps.torsoAnimTimer;
-			goto EndOfFrame;
+			return;
 		}
 
 		// Just sit here
-		goto EndOfFrame;
+		return;
 	}
 	else if (NPC->client->ps.saberInFlight &&
 		!PM_SaberInBrokenParry(NPC->client->ps.saber_move) &&
@@ -2720,7 +2706,7 @@ Nextsegment:
 			ucmd.buttons |= BUTTON_ALT_ATTACK;
 		}
 
-		goto EndOfFrame;
+		return;
 	}
 	else if (!TIMER_Done(NPC, "taunting"))
 	{
@@ -2744,7 +2730,7 @@ Nextsegment:
 			}
 		}
 
-		goto EndOfFrame;
+		return;
 	}
 	else if (NPC->client->ps.saberEventFlags & SEF_LOCK_WON)
 	{
@@ -2766,7 +2752,7 @@ Nextsegment:
 		TIMER_Set(NPC, "strafeLeft", -1);
 		TIMER_Set(NPC, "strafeRight", -1);
 
-		goto EndOfFrame;
+		return;
 	}
 	else if (NPC->enemy->client &&
 		NPC->enemy->s.weapon == WP_SABER &&
@@ -2778,7 +2764,7 @@ Nextsegment:
 			jedi_retreat();
 		}
 
-		goto EndOfFrame;
+		return;
 	}
 	else if (NPC->enemy->s.weapon == WP_TURRET &&
 		!Q_stricmp("PAS", NPC->enemy->classname) &&
@@ -2825,7 +2811,7 @@ Nextsegment:
 			}
 		}
 
-		goto EndOfFrame;
+		return;
 	}
 	else if (enemy_dist <= 64
 		&& (NPCInfo->scriptFlags & SCF_DONT_FIRE
@@ -2845,7 +2831,7 @@ Nextsegment:
 				TIMER_Set(NPC, "draining", 3000);
 				TIMER_Set(NPC, "attackDelay", 3000);
 				jedi_advance();
-				goto EndOfFrame;
+				return;
 			}
 
 			if (jedi_decide_kick())
@@ -2855,7 +2841,7 @@ Nextsegment:
 						G_PickAutoKick(NPC, NPC->enemy, qtrue) != LS_NONE))
 				{
 					TIMER_Set(NPC, "kickDebounce", Q_irand(8000, 15000));
-					goto EndOfFrame;
+					return;
 				}
 			}
 
@@ -2894,7 +2880,7 @@ Nextsegment:
 		TIMER_Set(NPC, "draining", 3000);
 		TIMER_Set(NPC, "attackDelay", 3000);
 		jedi_advance();
-		goto EndOfFrame;
+		return;
 	}
 
 	else if (enemy_dist <= -16)
@@ -3481,7 +3467,7 @@ Nextsegment:
 		if (!Q_irand(0, 30) && kyle_can_do_grab())
 		{
 			kyle_try_grab();
-			goto EndOfFrame;
+			return;
 		}
 
 		if (NPCInfo->stats.aggression < 4)
@@ -3493,7 +3479,7 @@ Nextsegment:
 						G_PickAutoKick(NPC, NPC->enemy, qtrue) != LS_NONE))
 				{
 					TIMER_Set(NPC, "kickDebounce", Q_irand(8000, 15000));
-					goto EndOfFrame;
+					return;
 				}
 			}
 
@@ -3527,8 +3513,6 @@ Nextsegment:
 			jedi_rage();
 		}
 	}
-EndOfFrame:
-	return;
 }
 
 static qboolean Jedi_Strafe(const int strafe_time_min, const int strafe_time_max, const int next_strafe_time_min,
