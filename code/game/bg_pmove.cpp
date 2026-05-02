@@ -1401,8 +1401,9 @@ static qboolean PM_CheckJump()
 					&& pm->ps->legsAnimTimer > 0)
 				{
 					//in the air
-					static vec3_t j_fwd_angs;
-					static vec3_t j_fwd_vec;
+					//FIXME: need an actual set time so it doesn't matter when the attack happens
+					//FIXME: make sure we don't jump further than force jump 3 allows
+					vec3_t j_fwd_angs, j_fwd_vec;
 					VectorSet(j_fwd_angs, 0, pm->ps->viewangles[YAW], 0);
 					AngleVectors(j_fwd_angs, j_fwd_vec, nullptr, nullptr);
 					float old_z_vel = pm->ps->velocity[2];
@@ -1464,8 +1465,7 @@ static qboolean PM_CheckJump()
 				&& pm->gent)
 			{
 				//start a force long-jump!
-				static vec3_t j_fwd_angs;
-				static vec3_t j_fwd_vec;
+				vec3_t j_fwd_angs, j_fwd_vec;
 				//BOTH_FORCELONGLEAP_ATTACK if holding attack, too?
 				PM_SetAnim(pm, SETANIM_BOTH, BOTH_FORCELONGLEAP_START, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
 				VectorSet(j_fwd_angs, 0, pm->ps->viewangles[YAW], 0);
@@ -1613,7 +1613,7 @@ static qboolean PM_CheckJump()
 							else if (pm->ps->forcePowerLevel[FP_LEVITATION] > FORCE_LEVEL_1)
 							{
 								//FIXME: really want to know how far off ground we are, probably...
-								static vec3_t facing_fwd, facing_right, facing_angles = { 0, pm->ps->viewangles[YAW], 0 };
+								vec3_t facing_fwd, facing_right, facing_angles = { 0, pm->ps->viewangles[YAW], 0 };
 								int anim = -1;
 								AngleVectors(facing_angles, facing_fwd, facing_right, nullptr);
 								float dot_r = DotProduct(facing_right, pm->ps->velocity);
@@ -2100,7 +2100,7 @@ static qboolean PM_CheckJump()
 
 			if (anim != -1 && PM_HasAnimation(pm->gent, anim))
 			{
-				static vec3_t fwd, right, traceto, mins = { pm->mins[0], pm->mins[1], 0 }, maxs = { pm->maxs[0], pm->maxs[1], 24 },
+				vec3_t fwd, right, traceto, mins = { pm->mins[0], pm->mins[1], 0 }, maxs = { pm->maxs[0], pm->maxs[1], 24 },
 					fwd_angles = { 0, pm->ps->viewangles[YAW], 0 };
 				trace_t trace;
 				qboolean do_trace = qfalse;
@@ -2315,19 +2315,7 @@ static qboolean PM_CheckJump()
 							|| anim == BOTH_WALL_FLIP_BACK1)
 						{
 							pm->ps->velocity[0] = pm->ps->velocity[1] = 0;
-							vec3_t move_dir{};
-							// prefer the projected forward vector (aligned with movement/ground), not camera
-							move_dir[0] = pml.forward[0];
-							move_dir[1] = pml.forward[1];
-							move_dir[2] = 0.0f;
-							if (VectorLengthSquared(move_dir) < 0.0001f)
-							{// fallback to the original view-based forward but projected to ground (no vertical)
-								move_dir[0] = fwd[0];
-								move_dir[1] = fwd[1];
-								move_dir[2] = 0.0f;
-							}
-							VectorNormalize(move_dir);
-							VectorMA(pm->ps->velocity, -150.0f, move_dir, pm->ps->velocity);
+							VectorMA(pm->ps->velocity, -150, fwd, pm->ps->velocity);
 						}
 						//kick if jumping off an ent
 						if (do_trace
@@ -3741,7 +3729,7 @@ static void PM_BocMove()
 					}
 					else if (pm->ps->forcePowerLevel[FP_LEVITATION] > FORCE_LEVEL_1)
 					{
-						static vec3_t facing_fwd, facing_right;
+						vec3_t facing_fwd, facing_right;
 						const vec3_t facing_angles = { 0, pm->ps->viewangles[YAW], 0 };
 						int anim = -1;
 						AngleVectors(facing_angles, facing_fwd, facing_right, nullptr);
@@ -4310,7 +4298,7 @@ static qboolean PM_TryRoll()
 		return qfalse;
 	}
 
-	static vec3_t fwd, right, traceto;
+	vec3_t fwd, right, traceto;
 	const vec3_t fwd_angles = { 0, pm->ps->viewangles[YAW], 0 };
 	const vec3_t maxs = { pm->maxs[0], pm->maxs[1], static_cast<float>(pm->gent->client->crouchheight) };
 	const vec3_t mins = { pm->mins[0], pm->mins[1], pm->mins[2] + STEPSIZE };
@@ -15405,7 +15393,8 @@ saber_moveName_t PM_NPCSaberAttackFromQuad(const int quad)
 					check_val = 1;
 				}
 
-				Next_Kill_Attack_Move_Check[pm->ps->clientNum] = level.time + (90000 / check_val); // 20 secs  g_attackskill->integer
+				Next_Kill_Attack_Move_Check[pm->ps->clientNum] =
+					level.time + (90000 / check_val); // 20 secs / g_attackskill->integer
 			}
 		}
 	}
